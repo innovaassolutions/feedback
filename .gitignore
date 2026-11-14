@@ -1,0 +1,37 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/.next-e2e/
+/out/
+/build
+
+# testing
+/coverage
+/test-results/
+/playwright-report/
+/.test-stack/
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+
+# env files: secrets stay out of git
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# the earlier prototype's local database
+/.data/
+
+# supabase local state
+supabase/.branches
+supabase/.temp
+
+# eval dry runs against the stub model are not evidence
+/evals/reports/*-stub-*

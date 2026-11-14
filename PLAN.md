@@ -247,16 +247,16 @@ API calls and pages run against `npm run dev` with a local Supabase (`supabase s
 
 Set up the Next.js app, the schema with Row Level Security, magic-link sign-in, roles, the seed data and the read-only course and session pages. Apply the seeded Streamspace theme. Set up the test servers.
 
-- [ ] `npm run db:reset` prints `Seeded 2 organizations, 2 courses, 4 sessions and 16 users`
-- [ ] Signing in by magic link as a seeded Streamspace learner lands on `/streamspace/ime-engineering`, which lists Session 1 as Feedback open and Session 2 as Upcoming. The draft session isn't listed
-- [ ] The same page as a seeded instructor lists all three sessions and shows an Admin link. A learner sees no Admin link, and `/streamspace/ime-engineering/admin` shows "Page not found"
-- [ ] Vitest: a Northwind learner reading Streamspace rows gets zero rows from every table, and the reverse holds
-- [ ] Vitest: a query of the Postgres catalog finds no table in `public` with Row Level Security off
-- [ ] An unknown course, and a real course the user isn't enrolled in, both show "Course not found"
-- [ ] Browser: the header on a Streamspace page and on a Northwind page have different computed background colors, each matching its seeded theme
-- [ ] `grep -rn SUPABASE_SECRET_KEY app components` finds nothing
-- [ ] `npm run e2e` passes while `npm run dev` is running
-- [ ] `npm run check` passes
+- [x] `npm run db:reset` prints `Seeded 2 organizations, 2 courses, 4 sessions and 16 users`
+- [x] Signing in by magic link as a seeded Streamspace learner lands on `/streamspace/ime-engineering`, which lists Session 1 as Feedback open and Session 2 as Upcoming. The draft session isn't listed
+- [x] The same page as a seeded instructor lists all three sessions and shows an Admin link. A learner sees no Admin link, and `/streamspace/ime-engineering/admin` shows "Page not found"
+- [x] Vitest: a Northwind learner reading Streamspace rows gets zero rows from every table, and the reverse holds
+- [x] Vitest: a query of the Postgres catalog finds no table in `public` with Row Level Security off
+- [x] An unknown course, and a real course the user isn't enrolled in, both show "Course not found"
+- [x] Browser: the header on a Streamspace page and on a Northwind page have different computed background colors, each matching its seeded theme
+- [x] `grep -rn SUPABASE_SECRET_KEY app components` finds nothing
+- [x] `npm run e2e` passes while `npm run dev` is running
+- [x] `npm run check` passes
 
 ## Phase 2: Instructor administration
 

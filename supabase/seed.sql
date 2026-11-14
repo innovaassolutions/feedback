@@ -1,0 +1,1 @@
+-- Seeding runs from scripts/seed.ts (npm run db:reset), because it creates users through Supabase Auth.
