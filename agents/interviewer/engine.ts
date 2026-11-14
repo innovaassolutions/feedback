@@ -1,0 +1,402 @@
+import { generateText, isStepCount, Output, type ModelMessage } from "ai";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
+import { choicesFor, isValidChoice, PREFER_NOT_TO_SAY, type GuidePart, type RatingItem, type Topic } from "@/lib/guide";
+import { errorName } from "@/lib/server/ai/runs";
+import { interviewerTools, type ToolEffect } from "./tools";
+import { readBackSchema, turnOutputSchema, type Progress, type Stage, type TurnOutput } from "./schema";
+
+// The Interviewer, as code and model together. Code decides the stage, counts turns and time,
+// tracks topics and checks every tool effect. The model writes the questions and follow-ups.
+
+export type Brief = { objectives: string[]; topics: string[]; known_issues: string[] };
+export type ActionItem = { you_said: string; we_did: string };
+export type Turn = { role: "learner" | "interviewer"; text: string; stage: Stage };
+
+export type EngineSetup = {
+  kind: "session" | "follow_up";
+  guide: GuidePart;
+  brief: Brief | null;
+  actions: ActionItem[];
+  courseTitle: string;
+  sessionTitle: string;
+  /** Only for named interviews. Never set for anonymous or private ones. */
+  learnerName: string | null;
+  limits: { maxTurns: number; maxMinutes: number };
+};
+
+export type EngineState = {
+  stage: Stage;
+  progress: Progress;
+  /** Learner turns so far, including the one being handled. */
+  turnCount: number;
+  startedAt: Date;
+  ratings: Record<string, string>;
+  history: Turn[];
+};
+
+export type RunRecord = {
+  operation: string;
+  usage?: { inputTokens?: number; outputTokens?: number };
+  providerMetadata?: unknown;
+  latencyMs: number;
+  outcome: "ok" | "validation_failed" | "error";
+  error?: string;
+};
+
+export type EngineResult = {
+  reply: string;
+  stage: Stage;
+  progress: Progress;
+  ratingsToSave: Array<{ item_id: string; choice: string }>;
+  effects: ToolEffect[];
+  /** Effects the model asked for that code refused, for the quality record. */
+  refused: ToolEffect[];
+  runs: RunRecord[];
+};
+
+export function initialProgress(setup: Pick<EngineSetup, "guide" | "brief" | "actions">): Progress {
+  const topics = setup.guide.topics
+    .filter((t) => (t.id === "brief_question" ? Boolean(setup.brief?.topics.length || setup.brief?.known_issues.length) : true))
+    .filter((t) => (t.id === "last_changes" ? setup.actions.length > 0 : true))
+    .map((t) => ({ id: t.id, status: "pending" as const }));
+  return {
+    rating_items: setup.guide.rating_items.map((r) => r.id),
+    current_item: null,
+    clarified: [],
+    topics,
+    current_topic: null,
+    last_offer: false,
+    proposed_summary: null,
+    blockers_flagged: 0,
+    questions_raised: 0,
+    read_back_turn: null,
+  };
+}
+
+const LEVEL_TEXT = {
+  named: "Named: your instructor sees your name with your answers",
+  anonymous: "Anonymous: your instructor sees your answers without your name or the time",
+  private: "Private: only a summary is kept, and your words are deleted once they've been analysed",
+} as const;
+
+export function openingMessage(sessionTitle: string, anonymity: keyof typeof LEVEL_TEXT, kind: "session" | "follow_up"): string {
+  const what = kind === "follow_up" ? "a short follow-up on how the course has helped at work" : `feedback on ${sessionTitle}`;
+  return `Thanks for giving ${what}. It takes five to eight minutes. You chose ${LEVEL_TEXT[anonymity]}. You can change that on the summary screen before you submit. Ready when you are.`;
+}
+
+export function ratingItem(setup: EngineSetup, id: string): RatingItem | undefined {
+  return setup.guide.rating_items.find((r) => r.id === id);
+}
+
+export function ratingPrompt(item: RatingItem, spoken: boolean): string {
+  if (!spoken) return item.prompt;
+  const choices = choicesFor(item).map((c) => c.label);
+  return `${item.prompt} You can say ${choices.slice(0, -1).join(", ")}, or ${choices[choices.length - 1]}.`;
+}
+
+function topicOf(setup: EngineSetup, id: string | null): Topic | undefined {
+  return id ? setup.guide.topics.find((t) => t.id === id) : undefined;
+}
+
+function openerFor(setup: EngineSetup, topic: Topic): string {
+  const briefTopic = setup.brief?.topics[0] ?? setup.brief?.known_issues[0] ?? "the session";
+  return topic.opener.replace("{topic}", briefTopic);
+}
+
+function clone(p: Progress): Progress {
+  return JSON.parse(JSON.stringify(p));
+}
+
+function nextPendingTopic(progress: Progress): string | null {
+  return progress.topics.find((t) => t.status === "pending")?.id ?? null;
+}
+
+function setTopicStatus(progress: Progress, id: string | null, status: Progress["topics"][number]["status"]) {
+  const t = progress.topics.find((x) => x.id === id);
+  if (t) t.status = status;
+}
+
+function toMessages(history: Turn[], learnerText: string): ModelMessage[] {
+  const messages: ModelMessage[] = history.map((t) =>
+    t.role === "learner" ? { role: "user", content: t.text } : { role: "assistant", content: t.text },
+  );
+  messages.push({ role: "user", content: learnerText });
+  return messages;
+}
+
+function contextBlock(setup: EngineSetup, extra: Record<string, unknown>): string {
+  const context = {
+    course: setup.courseTitle,
+    session: setup.sessionTitle,
+    kind: setup.kind,
+    brief: setup.brief,
+    changes_since_last_session: setup.actions,
+    learner_name: setup.learnerName,
+    ...extra,
+  };
+  return `\n\n## Context for this turn\n<context>${JSON.stringify(context)}</context>`;
+}
+
+type ModelDeps = { model: LanguageModelV4; instructions: string };
+
+async function modelTurn(
+  deps: ModelDeps,
+  setup: EngineSetup,
+  state: EngineState,
+  learnerText: string,
+  extra: Record<string, unknown>,
+  runs: RunRecord[],
+): Promise<{ output: TurnOutput | null; effects: ToolEffect[] }> {
+  const effects: ToolEffect[] = [];
+  const started = performance.now();
+  try {
+    const result = await generateText({
+      model: deps.model,
+      instructions: deps.instructions + contextBlock(setup, extra),
+      messages: toMessages(state.history, learnerText),
+      tools: interviewerTools(effects),
+      output: Output.object({ schema: turnOutputSchema }),
+      stopWhen: isStepCount(4),
+      maxOutputTokens: 600,
+    });
+    runs.push({ operation: `turn:${state.stage}`, usage: result.totalUsage, providerMetadata: result.providerMetadata, latencyMs: performance.now() - started, outcome: "ok" });
+    return { output: turnOutputSchema.parse(result.output), effects };
+  } catch (err) {
+    runs.push({ operation: `turn:${state.stage}`, latencyMs: performance.now() - started, outcome: "validation_failed", error: errorName(err) });
+    return { output: null, effects };
+  }
+}
+
+export async function readBack(deps: ModelDeps, setup: EngineSetup, history: Turn[], correction: string | null, previous: string[] | null, runs: RunRecord[]): Promise<string[]> {
+  const started = performance.now();
+  const transcript = history.filter((t) => t.stage === "conversation" || t.stage === "read_back");
+  try {
+    const result = await generateText({
+      model: deps.model,
+      instructions: deps.instructions + contextBlock(setup, { stage: "read_back", previous_summary: previous, correction }),
+      messages: toMessages(
+        transcript,
+        correction ? `Please update the summary. ${correction}` : "Please summarise what you heard in three to five points.",
+      ),
+      output: Output.object({ schema: readBackSchema }),
+      maxOutputTokens: 700,
+    });
+    runs.push({ operation: "read_back", usage: result.totalUsage, providerMetadata: result.providerMetadata, latencyMs: performance.now() - started, outcome: "ok" });
+    return readBackSchema.parse(result.output).points;
+  } catch (err) {
+    runs.push({ operation: "read_back", latencyMs: performance.now() - started, outcome: "validation_failed", error: errorName(err) });
+    // A plain fallback the learner can edit, so the interview can still be submitted.
+    return previous ?? ["Thanks for your feedback. Add or edit points here before you submit."];
+  }
+}
+
+function readBackReply(points: string[]): string {
+  return `Here's what I heard. ${points.map((p, i) => `${i + 1}. ${p}`).join(" ")} Check these on the summary screen, change anything that's wrong, then submit.`;
+}
+
+/** The limits come first: at max_turns or max_minutes the interview moves to the read-back. */
+export function limitReached(setup: EngineSetup, state: EngineState, now: Date): boolean {
+  const minutes = (now.getTime() - state.startedAt.getTime()) / 60_000;
+  return state.turnCount >= setup.limits.maxTurns || minutes >= setup.limits.maxMinutes;
+}
+
+export function hardLimit(setup: EngineSetup): number {
+  return setup.limits.maxTurns + 4;
+}
+
+/** Moves the ratings stage on to the next unanswered item, or into the conversation. */
+export function advanceRatings(setup: EngineSetup, progress: Progress, ratings: Record<string, string>, spoken: boolean): { stage: Stage; prompt: string } {
+  const next = progress.rating_items.find((id) => !(id in ratings));
+  if (next) {
+    progress.current_item = next;
+    return { stage: "ratings", prompt: ratingPrompt(ratingItem(setup, next)!, spoken) };
+  }
+  progress.current_item = null;
+  const first = nextPendingTopic(progress);
+  if (!first) return { stage: "read_back", prompt: "" };
+  progress.current_topic = first;
+  setTopicStatus(progress, first, "asked");
+  return { stage: "conversation", prompt: openerFor(setup, topicOf(setup, first)!) };
+}
+
+export async function handleLearnerTurn(
+  deps: ModelDeps,
+  setup: EngineSetup,
+  state: EngineState,
+  learnerText: string,
+  mode: "text" | "voice",
+  now: Date,
+): Promise<EngineResult> {
+  const progress = clone(state.progress);
+  const runs: RunRecord[] = [];
+  const effects: ToolEffect[] = [];
+  const refused: ToolEffect[] = [];
+  const ratingsToSave: Array<{ item_id: string; choice: string }> = [];
+  const ratings = { ...state.ratings };
+  const spoken = mode === "voice";
+
+  const toReadBack = async (lead: string): Promise<EngineResult> => {
+    const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
+    const points = await readBack(deps, setup, history, null, null, runs);
+    progress.proposed_summary = points;
+    progress.current_topic = null;
+    progress.current_item = null;
+    progress.read_back_turn ??= state.turnCount;
+    return { reply: `${lead}${lead ? " " : ""}${readBackReply(points)}`, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+  };
+
+  // Consent: the learner chose their level on the consent screen; their first turn starts the interview.
+  if (state.stage === "consent") {
+    const first = progress.rating_items[0];
+    progress.current_item = first ?? null;
+    if (!first) {
+      const step = advanceRatings(setup, progress, ratings, spoken);
+      return { reply: step.prompt, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
+    }
+    return { reply: ratingPrompt(ratingItem(setup, first)!, spoken), stage: "ratings", progress, ratingsToSave, effects, refused, runs };
+  }
+
+  if (state.stage === "read_back") {
+    const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
+    const points = await readBack(deps, setup, history, learnerText, progress.proposed_summary, runs);
+    progress.proposed_summary = points;
+    return { reply: `I've updated the summary. ${readBackReply(points)}`, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+  }
+
+  if (limitReached(setup, state, now)) {
+    return toReadBack("We're at time, so let's wrap up.");
+  }
+
+  if (state.stage === "ratings") {
+    const item = ratingItem(setup, progress.current_item ?? "");
+    if (!item) {
+      const step = advanceRatings(setup, progress, ratings, spoken);
+      return { reply: step.prompt, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
+    }
+    const { output, effects: asked } = await modelTurn(deps, setup, { ...state, progress }, learnerText, {
+      stage: "ratings",
+      item: { id: item.id, prompt: item.prompt, choices: choicesFor(item) },
+      already_clarified: progress.clarified.includes(item.id),
+    }, runs);
+    let saved = false;
+    for (const e of asked) {
+      if (e.type === "save_rating") {
+        const target = ratingItem(setup, e.item_id);
+        if (target && isValidChoice(target, e.choice)) {
+          ratings[e.item_id] = e.choice;
+          ratingsToSave.push({ item_id: e.item_id, choice: e.choice });
+          if (e.item_id === item.id) saved = true;
+        } else refused.push(e);
+      } else if (e.type === "flag_blocker") {
+        effects.push(e);
+        progress.blockers_flagged++;
+      } else if (e.type === "end_interview") {
+        effects.push(e);
+        return toReadBack("");
+      } else refused.push(e);
+    }
+    if (!saved) {
+      if (!progress.clarified.includes(item.id)) {
+        progress.clarified.push(item.id);
+        const choices = choicesFor(item).map((c) => c.label).join(", ");
+        const reply = output?.reply ?? `Sorry, I didn't quite catch that. Which is closest: ${choices}?`;
+        return { reply, stage: "ratings", progress, ratingsToSave, effects, refused, runs };
+      }
+      // Asked once already: record it as skipped rather than push the learner.
+      ratings[item.id] = PREFER_NOT_TO_SAY;
+      ratingsToSave.push({ item_id: item.id, choice: PREFER_NOT_TO_SAY });
+      const step = advanceRatings(setup, progress, ratings, spoken);
+      if (step.stage === "read_back") return toReadBack("No problem, let's move on.");
+      return { reply: `No problem, let's move on. ${step.prompt}`, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
+    }
+    const step = advanceRatings(setup, progress, ratings, spoken);
+    if (step.stage === "read_back") return toReadBack("Thanks.");
+    return { reply: `Thanks. ${step.prompt}`, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
+  }
+
+  // Conversation.
+  const current = topicOf(setup, progress.current_topic);
+  const currentState = progress.topics.find((t) => t.id === progress.current_topic);
+  const followUpAvailable = currentState?.status === "asked";
+  const nextId = progress.topics.find((t) => t.status === "pending" && t.id !== progress.current_topic)?.id ?? null;
+  const next = topicOf(setup, nextId);
+  const { output, effects: asked } = await modelTurn(deps, setup, { ...state, progress }, learnerText, {
+    stage: "conversation",
+    current_topic: current ? { id: current.id, label: current.label, goal: current.goal, follow_up_available: followUpAvailable } : null,
+    next_topic: next ? { id: next.id, label: next.label, goal: next.goal, suggested_opener: openerFor(setup, next) } : null,
+    you_offered_to_post_a_question_last_turn: progress.last_offer,
+  }, runs);
+
+  let ending = false;
+  for (const e of asked) {
+    if (e.type === "raise_question") {
+      // Code holds the consent rule: only if the previous turn offered and this is the reply.
+      if (progress.last_offer && progress.questions_raised < 3) {
+        effects.push(e);
+        progress.questions_raised++;
+      } else refused.push(e);
+    } else if (e.type === "flag_blocker") {
+      if (progress.blockers_flagged < 3) {
+        effects.push(e);
+        progress.blockers_flagged++;
+      } else refused.push(e);
+    } else if (e.type === "end_interview") {
+      effects.push(e);
+      ending = true;
+    } else if (e.type === "save_rating") {
+      const target = ratingItem(setup, e.item_id);
+      if (target && isValidChoice(target, e.choice)) {
+        ratings[e.item_id] = e.choice;
+        ratingsToSave.push({ item_id: e.item_id, choice: e.choice });
+      } else refused.push(e);
+    }
+  }
+  if (ending) return toReadBack("Of course.");
+
+  if (!output) {
+    // The model's output failed validation: keep the interview moving with the next opener.
+    setTopicStatus(progress, progress.current_topic, "covered");
+    progress.last_offer = false;
+    if (!next) return toReadBack("Thank you.");
+    progress.current_topic = next.id;
+    setTopicStatus(progress, next.id, "asked");
+    return { reply: openerFor(setup, next), stage: "conversation", progress, ratingsToSave, effects, refused, runs };
+  }
+
+  progress.last_offer = output.offered_to_post_question;
+  let action = output.topic_action;
+  if (output.learner_declined) {
+    setTopicStatus(progress, progress.current_topic, "skipped");
+    action = "next_topic";
+  } else if (action === "follow_up" && !followUpAvailable) {
+    action = "next_topic"; // one follow-up per topic, held in code
+  }
+
+  if (action === "stay") return { reply: output.reply, stage: "conversation", progress, ratingsToSave, effects, refused, runs };
+  if (action === "follow_up") {
+    setTopicStatus(progress, progress.current_topic, "followed_up");
+    return { reply: output.reply, stage: "conversation", progress, ratingsToSave, effects, refused, runs };
+  }
+
+  if (!output.learner_declined) setTopicStatus(progress, progress.current_topic, "covered");
+  if (!next) return toReadBack(output.reply.replace(/\?[^?]*$/, "").trim() || "Thank you.");
+  progress.current_topic = next.id;
+  setTopicStatus(progress, next.id, "asked");
+  // If the model ignored the rule and asked a follow-up anyway, use the next topic's opener.
+  const reply = output.topic_action === "follow_up" && !output.learner_declined ? openerFor(setup, next) : output.reply;
+  return { reply, stage: "conversation", progress, ratingsToSave, effects, refused, runs };
+}
+
+/** A chip tap: saves a rating without calling the model and moves the ratings stage on. */
+export function handleChip(setup: EngineSetup, state: EngineState, itemId: string, choice: string): { reply: string | null; stage: Stage; progress: Progress; needsReadBack: boolean } {
+  const progress = clone(state.progress);
+  const ratings = { ...state.ratings, [itemId]: choice };
+  if (state.stage !== "ratings" || progress.current_item !== itemId) return { reply: null, stage: state.stage, progress, needsReadBack: false };
+  const step = advanceRatings(setup, progress, ratings, false);
+  if (step.stage === "read_back") return { reply: null, stage: "ratings", progress, needsReadBack: true };
+  return { reply: step.prompt, stage: step.stage, progress, needsReadBack: false };
+}
+
+export function coveredOrSkipped(progress: Progress): boolean {
+  return progress.topics.every((t) => t.status === "covered" || t.status === "skipped" || t.status === "followed_up");
+}

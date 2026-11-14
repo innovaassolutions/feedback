@@ -276,19 +276,19 @@ Add `create_session`, `set_session_state`, `add_document`, `remove_document`, `a
 
 Write `agents/interviewer/AGENT.md`, `agents/analyst/AGENT.md` and the default guide. Add `start_interview`, `send_turn`, `save_rating` and `submit_interview`, the chat page, the analysis job and the eval sets.
 
-- [ ] A test checks that the Interviewer's tools are exactly `save_rating`, `raise_question`, `flag_blocker` and `end_interview`
-- [ ] Stub model test, named: consent, four ratings, the conversation, the read-back and submission. The interview ends `analysed`, is linked to the learner, and has its turns recorded in order
-- [ ] Stub model test, anonymous: the interview has no `participant_id`, and a `completions` row exists with a date and no time. A schema test confirms no column or key links the two tables
-- [ ] Stub model test, private: after analysis no turns remain, and the insights hold paraphrases and no quotes
-- [ ] `start_interview` returns 403 for a user who isn't enrolled, 409 for a session that isn't open, and 409 after the learner has submitted for that session
-- [ ] `send_turn` without a valid token returns 401. At turn 14 the Interviewer moves to the read-back, and a turn past the hard limit returns 409
-- [ ] Choosing "Prefer not to say" on every rating still allows submission. Leaving one rating unanswered returns 422
-- [ ] Analyst stub tests: a quote that isn't in the learner's turns is dropped, and a theme outside the list is retried once and then marks the interview `needs_review`
-- [ ] Stub model test: when the learner agrees, `raise_question` stores an open question on the session. Without agreement nothing is stored
-- [ ] Browser: rating choices show as chips, a progress marker shows the stage, and the summary screen lets the learner edit points and change the anonymity level before submitting
+- [x] A test checks that the Interviewer's tools are exactly `save_rating`, `raise_question`, `flag_blocker` and `end_interview`
+- [x] Stub model test, named: consent, four ratings, the conversation, the read-back and submission. The interview ends `analysed`, is linked to the learner, and has its turns recorded in order
+- [x] Stub model test, anonymous: the interview has no `participant_id`, and a `completions` row exists with a date and no time. A schema test confirms no column or key links the two tables
+- [x] Stub model test, private: after analysis no turns remain, and the insights hold paraphrases and no quotes
+- [x] `start_interview` returns 403 for a user who isn't enrolled, 409 for a session that isn't open, and 409 after the learner has submitted for that session
+- [x] `send_turn` without a valid token returns 401. At turn 14 the Interviewer moves to the read-back, and a turn past the hard limit returns 409
+- [x] Choosing "Prefer not to say" on every rating still allows submission. Leaving one rating unanswered returns 422
+- [x] Analyst stub tests: a quote that isn't in the learner's turns is dropped, and a theme outside the list is retried once and then marks the interview `needs_review`
+- [x] Stub model test: when the learner agrees, `raise_question` stores an open question on the session. Without agreement nothing is stored
+- [x] Browser: rating choices show as chips, a progress marker shows the stage, and the summary screen lets the learner edit points and change the anonymity level before submitting
 - [ ] Live: a full interview on Session 1 finishes in under eight minutes, the read-back mentions a topic from the session brief, and the insights name at least one theme
 - [ ] Live: `npm run evals` scores at least 90% on the rubric across the eight personas and 85% agreement on the twelve labelled transcripts, and saves its report
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 4: The feedback dashboard
 
