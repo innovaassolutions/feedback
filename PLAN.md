@@ -294,17 +294,17 @@ Write `agents/interviewer/AGENT.md`, `agents/analyst/AGENT.md` and the default g
 
 Add `get_session_results`, `list_interviews` and `record_action`, the dashboard pages with tiles and charts, the session summary, the small-group rule and the print view.
 
-- [ ] Vitest covers each metric: response rate, Able to apply, the pace spread, the Recommend average, and the Net Promoter Score appearing only at ten or more responses
-- [ ] After `npm run seed:demo`, Session 1 shows Responses 7 of 8, Able to apply 5 of 7, Pace about right 4 of 7 and Recommend 7.7, with no Net Promoter Score
-- [ ] Browser: the ability, pace, theme and trend charts render, each with a table view holding the same numbers
-- [ ] With four submitted interviews, `get_session_results` returns only the count, and the page shows "Results appear once 5 learners have responded"
-- [ ] An instructor's transcript list shows three named interviews with names and three anonymous ones with no name or time. A test with a fixed shuffle seed confirms the anonymous ones don't come back in submission order. The private interview never appears
-- [ ] A sponsor sees the tiles, charts, themes and actions. The transcript list and quotes return 404
-- [ ] Stub model test: a session summary containing a number that wasn't passed in is replaced by the template summary
-- [ ] An instructor records a "You said, we did" item on Session 1. It appears on the learner's Session 2 page and in the Interviewer's context for Session 2
-- [ ] Browser: the print view of the session report has no navigation and fits A4 pages
-- [ ] Browser: charts use the organization's chart colors in light and dark mode, and the console shows no errors
-- [ ] `npm run check` passes
+- [x] Vitest covers each metric: response rate, Able to apply, the pace spread, the Recommend average, and the Net Promoter Score appearing only at ten or more responses
+- [x] After `npm run seed:demo`, Session 1 shows Responses 7 of 8, Able to apply 5 of 7, Pace about right 4 of 7 and Recommend 7.7, with no Net Promoter Score
+- [x] Browser: the ability, pace, theme and trend charts render, each with a table view holding the same numbers
+- [x] With four submitted interviews, `get_session_results` returns only the count, and the page shows "Results appear once 5 learners have responded"
+- [x] An instructor's transcript list shows three named interviews with names and three anonymous ones with no name or time. A test with a fixed shuffle seed confirms the anonymous ones don't come back in submission order. The private interview never appears
+- [x] A sponsor sees the tiles, charts, themes and actions. The transcript list and quotes return 404
+- [x] Stub model test: a session summary containing a number that wasn't passed in is replaced by the template summary
+- [x] An instructor records a "You said, we did" item on Session 1. It appears on the learner's Session 2 page and in the Interviewer's context for Session 2
+- [x] Browser: the print view of the session report has no navigation and fits A4 pages
+- [x] Browser: charts use the organization's chart colors in light and dark mode, and the console shows no errors
+- [x] `npm run check` passes
 
 ## Phase 5: Voice
 
