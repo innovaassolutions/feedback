@@ -342,15 +342,15 @@ Add `list_questions`, `ask_question`, `vote_question`, `answer_question` and `ad
 
 Add `propose_theme` and `approve_theme`, the Brand designer, the preview page and organization setup for the platform admin.
 
-- [ ] A PNG or SVG logo up to 2 MB uploads. Anything else returns 422
-- [ ] Stub model test: the proposal has every token for light and dark mode and passes the schema
-- [ ] Vitest: a proposal with a text and background pair under 4.5:1 is adjusted until it passes. `approve_theme` with a failing pair returns 422
-- [ ] Browser: the preview shows the header, a dashboard tile, a chart and the chat in the proposed theme before approval. Changing a color updates the preview
-- [ ] After approval the whole organization uses the new theme on the next page load, with the logo in the header, on the sign-in page and on the printed report
-- [ ] Theme history lists earlier themes, and restoring one makes it live
-- [ ] e2e: a platform admin creates a third organization with a name, address and logo, approves its theme, creates a course and invites a learner, with no code change
+- [x] A PNG or SVG logo up to 2 MB uploads. Anything else returns 422
+- [x] Stub model test: the proposal has every token for light and dark mode and passes the schema
+- [x] Vitest: a proposal with a text and background pair under 4.5:1 is adjusted until it passes. `approve_theme` with a failing pair returns 422
+- [x] Browser: the preview shows the header, a dashboard tile, a chart and the chat in the proposed theme before approval. Changing a color updates the preview
+- [x] After approval the whole organization uses the new theme on the next page load, with the logo in the header, on the sign-in page and on the printed report
+- [x] Theme history lists earlier themes, and restoring one makes it live
+- [x] e2e: a platform admin creates a third organization with a name, address and logo, approves its theme, creates a course and invites a learner, with no code change
 - [ ] Live: from the Streamspace logo, the proposed primary color is in the logo's blue family and every pair passes the contrast check
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 8: Quality monitoring, reminders and the follow-up interview
 
