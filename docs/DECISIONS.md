@@ -6,7 +6,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 
 - Setup: `PLAN-EXPLORER.md` wasn't in the working directory, so the first commit on `main` holds `PLAN.md` and `CLAUDE.md` only.
 - Setup: the folder already held an earlier prototype ("Session Feedback": admin password, PGlite, the Anthropic SDK directly, `src/`). It doesn't match the plan's stack or layout, so it is kept on a local `prototype` branch and the build starts fresh on `build`. The older `docs/PLAN.md` draft is on that branch too.
-- Setup: pushing `main` was refused by the session's permission check, so `main` and `build` are committed locally and not pushed. See the closing section of `docs/STATUS.md`.
+- Setup: `main` and `build` were pushed once Todd confirmed the GitHub repository (`innovaassolutions/feedback`); the session's permission check had refused the first attempt.
 - Setup: the prototype's `.env.local` is kept as `.env.prototype.local` (ignored by git).
 - Setup: Next.js 16.4, React 19.3, Tailwind 4.3 (through `@tailwindcss/turbopack`, as the prototype had it), AI SDK 7, Supabase CLI 2.75, Vitest 5, Playwright 1.65.
 - Setup: added libraries the plan doesn't name: `@ai-sdk/gateway` (the AI Gateway provider), `unpdf` and `mammoth` (PDF and DOCX text), `node-html-parser` and `robots-parser` (documentation sites), `nodemailer` (SMTP to the local inbox), `sharp` (logo colours), `qrcode`, `recharts` (named in the plan), `postgres` (catalog checks in tests), `jszip` and `pdf-lib` (test fixtures), `tsx`.
@@ -99,6 +99,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 8: a learner's removal request runs through a security-definer function limited to rows that belong to `auth.uid()`; completion rows stay.
 - Phase 8: instructors act on anonymous interviews (mark accuracy, analyse again) through sealed references: AES-GCM with a fresh IV each time, so the page never holds an id and references can't be matched up.
 - Phase 8: the labelled-set candidate list shows course, session and Analyst version. Adding a transcript to the eval set is a manual step that needs the instructor's agreement.
+- Phase 8: CI pins the Supabase CLI to 2.75.0, the local version, because the latest (3.1) rejects the `[inbucket]` section of `supabase/config.toml`. Moving to 3.x means renaming that section to `[local_smtp]` and checking the test-stack script.
 
 ## Proposed plan changes
 

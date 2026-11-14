@@ -1,6 +1,6 @@
 # Status
 
-**All eight phases are built.** 76 of the plan's 85 criteria are verified and ticked. The nine that aren't are the eight Live criteria (no model key, no Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository) and the CI criterion, which needs a push to GitHub. See [Not yet verified](#not-yet-verified).
+**All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no model key or Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
 
 Last checked on 14 November 2026: `npm run check` passes (type check, lint, 92 Vitest tests in 12 files) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
 
@@ -90,21 +90,22 @@ Not done in this build (it needs Todd's accounts). The steps:
 | Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | No model key; no real rebuild guide | A gateway key and the guide on Session 1 |
 | Phase 6, Live: an answer citing `docs.streamspace.ai` | No model key | A gateway key; add the site as Dana under Admin → Product documentation, then ask on Session 1 |
 | Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | No model key; the seeded logo is a placeholder | A gateway key and the real logo, uploaded on `/streamspace/settings/brand` |
-| Phase 8: CI fails a change to any `AGENT.md` with no eval report for its version | Pushing to GitHub was refused by the session's permission check, so no Actions run has happened | Push `main` and `build`. Locally, `npm run evals:gate -- --base main` fails as it should: all four `AGENT.md` files are new and none has a report |
 
 Verified with a stand-in rather than the real service: Phase 5's browser criterion (microphone permission, spoken turns as microphone-marked bubbles, switching back to typing) ran in Chromium with a fake microphone and a stand-in for the Vocal Bridge client. The real service is covered by the two Live voice criteria above.
 
 ## Git
 
 - `main` holds the first commit (`PLAN.md`, `CLAUDE.md`). `build` holds the phase commits. A local `prototype` branch keeps the earlier "Session Feedback" app that was in the folder.
-- **Nothing is pushed.** The first push to `main` was refused by the session's permission check, so I didn't push `build` either. To publish: `git push -u origin main` then `git push -u origin build`.
+- `main` and `build` are pushed to `github.com/innovaassolutions/feedback`; `main` is the default branch. The `prototype` branch stays local.
+- The first CI run on `build` (run 43597848050) showed the eval gate working: the "Eval report for every changed `AGENT.md`" job failed, naming all four agents at 1.0.0 with no passing real-model report. It stays red until `npm run evals` runs with a model key and the report is committed.
+- That run's check job also failed, for a different reason: CI installed the latest Supabase CLI (3.1), which no longer accepts the `[inbucket]` section of `supabase/config.toml`. CI now pins the CLI to 2.75.0, the version this repository was built and tested with.
 - The code for all eight phases was written before the local database finished downloading (about 90 minutes on this connection), then verified together. The phase commits group the files by phase, so only the last commit, which is the verified tree, is guaranteed to pass `npm run check` and `npm run e2e` on its own.
 
 ## Closing notes
 
 **What was built.** Everything in the plan's eight phases: the multi-tenant app on Next.js and Supabase with Row Level Security on every table, four agents behind the Vercel AI SDK with versioned instructions, schemas, stubs and evals, the dashboard, Q&A, voice, branding, quality monitoring, reminders, the follow-up interview and retention.
 
-**Still unverified.** The nine criteria in the table above: eight need a model key, a Vocal Bridge account or the client's real files, and one needs a push to GitHub.
+**Still unverified.** The eight Live criteria in the table above. Each needs a model key, a Vocal Bridge account or the client's real files.
 
 **Decisions.** About 70 choices the plan didn't make are in `docs/DECISIONS.md`. The ones Todd is most likely to want to revisit:
 - one instructor per seeded organization doubles as its admin;

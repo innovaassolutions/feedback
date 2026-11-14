@@ -361,7 +361,7 @@ Add `get_quality`, the rubric job, alerts, the review queue, email reminders, th
 - [x] Stub test: a submitted named or anonymous interview gets a rubric result from the background job. A private interview gets the code-checked items only
 - [x] With seeded results under the pass marks, the platform admin receives an alert email
 - [x] An instructor marks an interview's insights Not accurate, and it appears in the list of candidates for the labelled set
-- [ ] CI fails a change to any `AGENT.md` that has no eval report for its new version
+- [x] CI fails a change to any `AGENT.md` that has no eval report for its new version
 - [x] With a fake clock: a learner with no completion gets one reminder 24 hours after the session opens and one 24 hours before it closes. A learner who has submitted gets none
 - [x] The follow-up interview opens `follow_up_days` after the last session, asks what the learner has used at work and what stopped them, and adds an "Applied at work" tile to the dashboard
 - [x] With a fake clock: transcripts older than `retention_days` are deleted. A learner's request removes their named interviews and questions
