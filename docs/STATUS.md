@@ -2,7 +2,7 @@
 
 **All eight phases are built.** 76 of the plan's 85 criteria are verified and ticked. The nine that aren't are the eight Live criteria (no model key, no Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository) and the CI criterion, which needs a push to GitHub. See [Not yet verified](#not-yet-verified).
 
-Last checked on 14 November 2026: `npm run check` passes (type check, lint, 85 Vitest tests) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
+Last checked on 14 November 2026: `npm run check` passes (type check, lint, 92 Vitest tests in 12 files) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
 
 ## What's built
 
@@ -121,6 +121,6 @@ Verified with a stand-in rather than the real service: Phase 5's browser criteri
 - The Analyst's session summary is a second task in its `AGENT.md`, which the plan doesn't mention.
 
 **Known risks.**
-- An instructor reading interviews directly through Supabase's REST API (bypassing the app) still can't see names, ids or times on anonymous rows, or anything below the group-size threshold. But rows come back in storage order, which loosely follows when they were last written. The app shuffles them; a determined instructor using the raw API might infer some ordering.
+- An instructor reading interviews directly through Supabase's REST API (bypassing the app) still can't see names or times on anonymous rows, or anything below the group-size threshold. But the raw API returns rows in storage order, which loosely follows when they were last written. The app sorts anonymous transcripts by content and then shuffles them, so its own output carries no ordering; a determined instructor using the raw API might infer some.
 - The stub model is rule-based. Nothing about the real agents' quality is known until the evals run.
 - The Vocal Bridge integration is built from the published `@vocalbridgeai/sdk` 0.1.1 API and hasn't met the real service.
