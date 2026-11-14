@@ -324,19 +324,19 @@ Add `get_voice_token` and the microphone to the chat window, using Vocal Bridge.
 
 Add `list_questions`, `ask_question`, `vote_question`, `answer_question` and `add_documentation_source`, the Q&A board on the session page, and the Librarian's answers from session documents, product documentation and verified answers.
 
-- [ ] A learner posts one question with their name and one anonymously. The anonymous row has no author id and shows as "Anonymous learner"
-- [ ] A learner's vote counts once, and a second vote returns 409. The list is ordered by votes and then time
-- [ ] A question or answer posted in one browser appears in another within two seconds, without a reload
-- [ ] Librarian stub tests: an answer cites at least one chunk from the course. A citation of a chunk from another course is rejected. With nothing relevant, the question moves to `needs_instructor` and the instructor is notified
-- [ ] Stub test against a five-page fixture documentation site: `add_documentation_source` stores chunks for all five pages. A second read updates a changed page and drops a removed one. A link to another host isn't followed
-- [ ] An instructor's verified answer becomes a source: a later, similar question is answered citing it. Deleting the answer removes it as a source
-- [ ] Stub test: when two sources disagree, the answer says so and the instructor is notified
-- [ ] An AI answer shows "AI answer · not reviewed" and links to its sources, each marked Session document, Documentation or Verified answer. A source with audience `agents_only` is named without a link
-- [ ] An instructor verifies an AI answer, and the label changes to "Answered by instructor". An instructor can also edit it, replace it, or delete the question. A learner calling `answer_question` gets 403
-- [ ] The dashboard gains a Q&A tile: open against answered, the median time to an answer, and how many questions went to the instructor
+- [x] A learner posts one question with their name and one anonymously. The anonymous row has no author id and shows as "Anonymous learner"
+- [x] A learner's vote counts once, and a second vote returns 409. The list is ordered by votes and then time
+- [x] A question or answer posted in one browser appears in another within two seconds, without a reload
+- [x] Librarian stub tests: an answer cites at least one chunk from the course. A citation of a chunk from another course is rejected. With nothing relevant, the question moves to `needs_instructor` and the instructor is notified
+- [x] Stub test against a five-page fixture documentation site: `add_documentation_source` stores chunks for all five pages. A second read updates a changed page and drops a removed one. A link to another host isn't followed
+- [x] An instructor's verified answer becomes a source: a later, similar question is answered citing it. Deleting the answer removes it as a source
+- [x] Stub test: when two sources disagree, the answer says so and the instructor is notified
+- [x] An AI answer shows "AI answer · not reviewed" and links to its sources, each marked Session document, Documentation or Verified answer. A source with audience `agents_only` is named without a link
+- [x] An instructor verifies an AI answer, and the label changes to "Answered by instructor". An instructor can also edit it, replace it, or delete the question. A learner calling `answer_question` gets 403
+- [x] The dashboard gains a Q&A tile: open against answered, the median time to an answer, and how many questions went to the instructor
 - [ ] Live: asking "How do I find my project ID?" on Session 1 returns an answer that points to the address bar and cites the rebuild guide
 - [ ] Live: after adding `docs.streamspace.ai`, asking "How do I publish a new version of a workflow?" returns an answer that cites a documentation page
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 7: Branding and a new tenant
 
