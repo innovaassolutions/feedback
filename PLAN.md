@@ -262,15 +262,15 @@ Set up the Next.js app, the schema with Row Level Security, magic-link sign-in, 
 
 Add `create_session`, `set_session_state`, `add_document`, `remove_document`, `approve_brief` and `invite_learners`, the administration pages, document reading by the Librarian, and the join link and QR code.
 
-- [ ] An instructor creates Session 4 with a title, date and objectives, and moves it Draft → Upcoming → Feedback open → Closed. Moving a closed session back returns 409
-- [ ] Uploading a PDF, a DOCX, a Markdown file and a VTT transcript each succeed. An `.exe` and a 26 MB file each return 422 and store nothing
-- [ ] A learner's session page lists the documents with audience `learners` and downloads them through a signed URL. An `agents_only` document isn't listed, and its URL returns 404 for a learner
-- [ ] Stub model test: reading a document stores its chunks with embeddings and moves it `processing` → `ready`. A corrupt file ends as `failed`, with a message on the administration page
-- [ ] Stub model test: the drafted brief has objectives, topics and known issues, and `get_session` returns no brief to the Interviewer until an instructor approves it
-- [ ] Pasting three email addresses creates three enrollments and three sign-in emails in the local inbox. A duplicate address is skipped and reported
-- [ ] The session page shows a join link and a QR code. Opening it signed out leads to sign-in and then to that session's interview
+- [x] An instructor creates Session 4 with a title, date and objectives, and moves it Draft → Upcoming → Feedback open → Closed. Moving a closed session back returns 409
+- [x] Uploading a PDF, a DOCX, a Markdown file and a VTT transcript each succeed. An `.exe` and a 26 MB file each return 422 and store nothing
+- [x] A learner's session page lists the documents with audience `learners` and downloads them through a signed URL. An `agents_only` document isn't listed, and its URL returns 404 for a learner
+- [x] Stub model test: reading a document stores its chunks with embeddings and moves it `processing` → `ready`. A corrupt file ends as `failed`, with a message on the administration page
+- [x] Stub model test: the drafted brief has objectives, topics and known issues, and `get_session` returns no brief to the Interviewer until an instructor approves it
+- [x] Pasting three email addresses creates three enrollments and three sign-in emails in the local inbox. A duplicate address is skipped and reported
+- [x] The session page shows a join link and a QR code. Opening it signed out leads to sign-in and then to that session's interview
 - [ ] Live: after uploading the Session 1 rebuild guide, the drafted brief names topics such as Get Document Data, Core Agent and Link Generator
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 3: The Interviewer and the Analyst, in chat
 
