@@ -18,11 +18,12 @@ export type AdminDocument = {
 const STATUS_LABEL = { processing: "Reading…", ready: "Ready", failed: "Couldn't read" } as const;
 const AUDIENCE_LABEL = { learners: "Learners and agents", agents_only: "Agents only" } as const;
 
-export function DocumentsPanel({ sessionId, documents }: { sessionId: string; documents: AdminDocument[] }) {
+export function DocumentsPanel({ sessionId, documents, waitingForBrief = false }: { sessionId: string; documents: AdminDocument[]; waitingForBrief?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const processing = documents.some((d) => d.status === "processing");
+  // Refresh while a document is being read, and after that until the brief draft arrives.
+  const processing = documents.some((d) => d.status === "processing") || waitingForBrief;
 
   useEffect(() => {
     if (!processing) return;

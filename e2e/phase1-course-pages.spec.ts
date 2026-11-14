@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { NORTHWIND_THEME, SEED_USERS, STREAMSPACE_THEME } from "../lib/server/seed";
-import { rgb, signIn, waitForSignInLink } from "./support";
+import { admin, rgb, signIn, waitForSignInLink } from "./support";
 
 const COURSE = "/streamspace/ime-engineering";
 
@@ -62,4 +62,44 @@ test("each organization's header uses its own theme", async ({ browser }) => {
   const dark = await browser.newPage({ colorScheme: "dark" });
   await signIn(dark, "diego", COURSE);
   expect(await bg(dark)).toBe(rgb(STREAMSPACE_THEME.dark.primary));
+});
+
+test("header links are readable: each takes the theme's on-primary color, not the header's own", async ({ page }) => {
+  await signIn(page, "dana", COURSE);
+  const header = page.getByTestId("org-header");
+  await expect(header.getByRole("link", { name: "Branding" })).toBeVisible();
+  const colors = await header.evaluate((el) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--on-primary)";
+    el.appendChild(probe);
+    const onPrimary = getComputedStyle(probe).color;
+    probe.remove();
+    return { background: getComputedStyle(el).backgroundColor, onPrimary, links: [...el.querySelectorAll("a")].map((a) => getComputedStyle(a).color) };
+  });
+  // The organization name, then Sessions, Dashboard, Admin and Branding.
+  expect(colors.links).toHaveLength(5);
+  for (const color of colors.links) {
+    expect(color).toBe(colors.onPrimary);
+    expect(color).not.toBe(colors.background);
+  }
+});
+
+test("an organization admin with no course yet reaches branding and course creation from the organization page", async ({ page }) => {
+  const db = admin();
+  const stamp = Date.now();
+  const slug = `harbour-${stamp}`;
+  const email = `ines.${stamp}@harbour.example`;
+  const { data: org, error: orgError } = await db.from("organizations").insert({ slug, name: "Harbour Training" }).select("id").single();
+  if (orgError) throw orgError;
+  const { data: created, error: userError } = await db.auth.admin.createUser({ email, email_confirm: true });
+  if (userError) throw userError;
+  const { error } = await db.from("memberships").insert({ organization_id: org.id, user_id: created.user.id, role: "org_admin", course_id: null, display_name: "Ines Novak", email });
+  if (error) throw error;
+
+  await signIn(page, email, `/${slug}`);
+  const header = page.getByTestId("org-header");
+  await expect(header.getByRole("link", { name: "Branding" })).toHaveAttribute("href", `/${slug}/settings/brand`);
+  await expect(header.getByRole("link", { name: "Manage courses" })).toBeVisible();
+  await page.getByRole("link", { name: "Create the first course" }).click();
+  await expect(page).toHaveURL(new RegExp(`/${slug}/settings/courses$`));
 });

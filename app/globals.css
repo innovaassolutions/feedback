@@ -34,29 +34,36 @@
   --font-body: var(--t-font-body);
 }
 
-html,
-body {
-  background: var(--background);
-  color: var(--text);
-}
+/*
+ * Element defaults sit in the base layer so utility classes override them. Outside a layer they
+ * would win over every utility: links in the header took the primary color on a primary
+ * background and disappeared.
+ */
+@layer base {
+  html,
+  body {
+    background: var(--background);
+    color: var(--text);
+  }
 
-body {
-  font-family: var(--t-font-body);
-}
+  body {
+    font-family: var(--t-font-body);
+  }
 
-h1,
-h2,
-h3 {
-  font-family: var(--t-font-heading);
-}
+  h1,
+  h2,
+  h3 {
+    font-family: var(--t-font-heading);
+  }
 
-a {
-  color: var(--primary);
-}
+  a {
+    color: var(--primary);
+  }
 
-:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
 }
 
 @media print {

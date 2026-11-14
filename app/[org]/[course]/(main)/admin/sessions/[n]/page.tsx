@@ -11,6 +11,17 @@ import { JoinLink } from "@/components/join-link";
 
 type Brief = { objectives: string[]; topics: string[]; known_issues: string[] };
 
+/**
+ * The Librarian drafts the brief after a document is read, so the page keeps refreshing until the
+ * draft is newer than the latest ready document. A draft that never comes stops the wait after
+ * two minutes.
+ */
+function waitingForBrief(documents: Array<{ status: string; updated_at: string }>, briefDraftAt: string | null): boolean {
+  const draftAt = briefDraftAt ? Date.parse(briefDraftAt) : 0;
+  const now = Date.now();
+  return documents.some((d) => d.status === "ready" && Date.parse(d.updated_at) > draftAt && now - Date.parse(d.updated_at) < 120_000);
+}
+
 export default async function AdminSessionPage({ params }: PageProps<"/[org]/[course]/admin/sessions/[n]">) {
   const { org, course, n } = await params;
   const ctx = await requireCourse(org, course);
@@ -24,7 +35,7 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
   if (!session) notFound();
   const { data: documents } = await db
     .from("documents")
-    .select("id, title, audience, status, error, file_name, size_bytes")
+    .select("id, title, audience, status, error, file_name, size_bytes, updated_at")
     .eq("session_id", session.id)
     .order("created_at");
   const joinUrl = `${await requestOrigin()}/${org}/${course}/sessions/${session.number}/interview`;
@@ -49,7 +60,7 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
         </Card>
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Documents</h2>
-          <DocumentsPanel sessionId={session.id} documents={documents ?? []} />
+          <DocumentsPanel sessionId={session.id} documents={documents ?? []} waitingForBrief={waitingForBrief(documents ?? [], session.brief_draft_at)} />
         </Card>
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Session brief</h2>

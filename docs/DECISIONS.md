@@ -26,6 +26,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 1: the Streamspace logo in the seed is a placeholder drawn for this build. Replace `scripts/assets/streamspace-logo.svg` with the real logo for the Live brand criterion.
 - Phase 1: API routes are left out of `proxy.ts`, because the proxy buffers request bodies up to 10 MB and would cut off document uploads. Route handlers refresh the session themselves.
 - Phase 1: a magic link returns to the address the person signed in from. The app sends `/auth/confirm?next=…` on that origin as the redirect, and the email template uses it, falling back to the site URL when Auth doesn't accept it. Redirects after confirm and sign-out use the Host header, since `request.url` says localhost in development.
+- Phase 1: organization admins get Branding and Manage courses links on the organization page as well as Branding in the course header, because an admin of a new organization has no course yet and lands there.
 - Phase 1: for trying the dev server on a phone, the local Auth allow list and `allowedDevOrigins` accept `*.local` names, and the browser's Supabase client swaps a loopback Supabase address for the page's host. Auth never redirects to non-loopback IP addresses, so an IP can't be used.
 
 ## Phase 2
@@ -37,6 +38,8 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 2: background work runs from a `jobs` table: `after()` processes it straight after the response, and Vercel Cron calls `/api/cron/tick` every 15 minutes for retries and scheduled work (`vercel.json`; a 15-minute cron needs a Pro plan).
 - Phase 2: the Librarian re-drafts the brief whenever a document finishes reading, from all of the session's ready documents. The instructor's approved brief is kept separately and only it reaches the Interviewer.
 - Phase 2: the QR code renders in the text colour on `bg-white`, because a QR code needs dark on light to scan.
+
+- Phase 2: after a document is read, the documents panel keeps refreshing until the Librarian's brief draft arrives (for up to two minutes), so the draft appears without a reload.
 
 ## Phase 3
 

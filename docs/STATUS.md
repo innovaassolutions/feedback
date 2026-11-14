@@ -2,7 +2,7 @@
 
 **All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no model key or Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
 
-Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 Vitest tests in 13 files) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
+Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 Vitest tests in 13 files) and `npm run e2e` passes (22 Playwright tests) while `npm run dev` is running.
 
 ## What's built
 

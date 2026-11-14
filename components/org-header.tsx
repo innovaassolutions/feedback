@@ -27,7 +27,7 @@ export function OrgHeader({
           ) : null}
           <span className="font-heading text-lg font-semibold">{orgName}</span>
         </Link>
-        <nav aria-label="Main" className="flex flex-1 flex-wrap items-center gap-4 text-sm">
+        <nav aria-label="Main" className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 text-sm sm:w-auto sm:flex-1">
           {nav.map((item) => (
             <Link key={item.href} href={item.href} className="text-on-primary underline-offset-4 hover:underline">
               {item.label}
