@@ -356,17 +356,17 @@ Add `propose_theme` and `approve_theme`, the Brand designer, the preview page an
 
 Add `get_quality`, the rubric job, alerts, the review queue, email reminders, the follow-up interview and data retention. Write `docs/STATUS.md`.
 
-- [ ] Every agent call writes an `agent_runs` row with the agent, `AGENT.md` version, model, tokens, cost, latency and outcome. Rows for anonymous and private interviews carry no learner id
-- [ ] The quality page shows each figure listed in the design, by agent and `AGENT.md` version
-- [ ] Stub test: a submitted named or anonymous interview gets a rubric result from the background job. A private interview gets the code-checked items only
-- [ ] With seeded results under the pass marks, the platform admin receives an alert email
-- [ ] An instructor marks an interview's insights Not accurate, and it appears in the list of candidates for the labelled set
+- [x] Every agent call writes an `agent_runs` row with the agent, `AGENT.md` version, model, tokens, cost, latency and outcome. Rows for anonymous and private interviews carry no learner id
+- [x] The quality page shows each figure listed in the design, by agent and `AGENT.md` version
+- [x] Stub test: a submitted named or anonymous interview gets a rubric result from the background job. A private interview gets the code-checked items only
+- [x] With seeded results under the pass marks, the platform admin receives an alert email
+- [x] An instructor marks an interview's insights Not accurate, and it appears in the list of candidates for the labelled set
 - [ ] CI fails a change to any `AGENT.md` that has no eval report for its new version
-- [ ] With a fake clock: a learner with no completion gets one reminder 24 hours after the session opens and one 24 hours before it closes. A learner who has submitted gets none
-- [ ] The follow-up interview opens `follow_up_days` after the last session, asks what the learner has used at work and what stopped them, and adds an "Applied at work" tile to the dashboard
-- [ ] With a fake clock: transcripts older than `retention_days` are deleted. A learner's request removes their named interviews and questions
-- [ ] `docs/STATUS.md` describes what's built, how to seed and run it, how to run the evals, and the latest eval results
-- [ ] `npm run check` passes
+- [x] With a fake clock: a learner with no completion gets one reminder 24 hours after the session opens and one 24 hours before it closes. A learner who has submitted gets none
+- [x] The follow-up interview opens `follow_up_days` after the last session, asks what the learner has used at work and what stopped them, and adds an "Applied at work" tile to the dashboard
+- [x] With a fake clock: transcripts older than `retention_days` are deleted. A learner's request removes their named interviews and questions
+- [x] `docs/STATUS.md` describes what's built, how to seed and run it, how to run the evals, and the latest eval results
+- [x] `npm run check` passes
 
 ## Open decisions
 
