@@ -185,7 +185,12 @@ export async function listInterviews(ctx: Ctx, input: OperationInput<"list_inter
     .filter((i) => i.anonymity === "named")
     .map((i) => ({ ref: i.id, name: nameOf.get(i.participant_id ?? "") ?? "Learner", ...build(i.id, i.summary, i.state) }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const anonymousRaw = (interviews ?? []).filter((i) => i.anonymity === "anonymous").map((i) => build(i.id, i.summary, i.state));
+  // Sorted by content first, so the database's row order (which loosely follows when rows were
+  // written) can't carry through, and a fixed seed gives a fixed order.
+  const anonymousRaw = (interviews ?? [])
+    .filter((i) => i.anonymity === "anonymous")
+    .map((i) => build(i.id, i.summary, i.state))
+    .sort((a, b) => JSON.stringify([a.summary, a.turns]).localeCompare(JSON.stringify([b.summary, b.turns])));
   const seed = opts.seed ?? crypto.getRandomValues(new Uint32Array(1))[0];
   const minGroup = course?.min_group_size ?? 5;
   return {

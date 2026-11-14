@@ -9,6 +9,7 @@ import { followUpWindow } from "@/lib/server/follow-up";
 import { adminClient } from "@/lib/server/supabase-admin";
 import { Card, PageTitle } from "@/components/ui";
 import { InterviewApp } from "@/components/interview/interview-app";
+import { voiceConfigured } from "@/lib/server/voice";
 
 function idFromCookie(name: string): string | null {
   const hex = name.slice(3);
@@ -58,7 +59,7 @@ export default async function InterviewPage({ params, searchParams }: PageProps<
           <p>{blocked}</p>
         </Card>
       ) : (
-        <InterviewApp sessionId={session.id} kind={kind} initial={resumed} voiceEnabled={Boolean(process.env.VOCAL_BRIDGE_API_KEY)} />
+        <InterviewApp sessionId={session.id} kind={kind} initial={resumed} voiceEnabled={voiceConfigured()} />
       )}
     </div>
   );

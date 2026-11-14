@@ -311,14 +311,14 @@ Add `get_session_results`, `list_interviews` and `record_action`, the dashboard 
 Add `get_voice_token` and the microphone to the chat window, using Vocal Bridge.
 
 - [ ] Live, first: a short trial confirms that every spoken turn reaches `send_turn` and every reply is spoken word for word. `docs/VOICE.md` records the result, the Vocal Bridge agent settings used, and whether audio recording can be turned off
-- [ ] `get_voice_token` without a valid interview token returns 401. `grep -rn VOCAL_BRIDGE_API_KEY app components` finds nothing
-- [ ] A test checks that the participant name sent to Vocal Bridge is "Learner" for anonymous and private interviews
-- [ ] Browser: pressing the microphone asks for permission, spoken turns appear as chat bubbles marked with a microphone, and switching back to typing continues the same interview
-- [ ] Stub test: saying "about right" at the pace item saves that rating. An unclear answer gets one clarifying question
-- [ ] With the microphone refused, or the voice service unreachable, the chat still works and shows a notice
-- [ ] `interview_turns` holds text only, and no audio file is written to Storage
+- [x] `get_voice_token` without a valid interview token returns 401. `grep -rn VOCAL_BRIDGE_API_KEY app components` finds nothing
+- [x] A test checks that the participant name sent to Vocal Bridge is "Learner" for anonymous and private interviews
+- [x] Browser: pressing the microphone asks for permission, spoken turns appear as chat bubbles marked with a microphone, and switching back to typing continues the same interview
+- [x] Stub test: saying "about right" at the pace item saves that rating. An unclear answer gets one clarifying question
+- [x] With the microphone refused, or the voice service unreachable, the chat still works and shows a notice
+- [x] `interview_turns` holds text only, and no audio file is written to Storage
 - [ ] Live: a full voice interview completes in Chrome on a laptop and in a phone browser
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 6: Session Q&A
 
