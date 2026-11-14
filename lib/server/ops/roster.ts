@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { signInRedirect } from "@/lib/auth";
 import type { Ctx } from "@/lib/server/ctx";
 import type { OperationInput } from "@/lib/operations";
 import { courseForUser, requireManage } from "./common";
@@ -47,7 +48,7 @@ export async function inviteLearners(ctx: Ctx, input: OperationInput<"invite_lea
   const mailClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  const redirect = `${ctx.origin}/${course.organizations.slug}/${course.slug}`;
+  const redirect = signInRedirect(ctx.origin, `/${course.organizations.slug}/${course.slug}`);
 
   for (const entry of input.emails.flatMap(splitPasted)) {
     const invitee = parseInvitee(entry);

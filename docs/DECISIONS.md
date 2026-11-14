@@ -25,6 +25,8 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 1: the approved font list is eight Google fonts loaded with `next/font`: Inter, IBM Plex Sans, Source Sans 3, Nunito Sans, Work Sans, Merriweather, Source Serif 4, Lora.
 - Phase 1: the Streamspace logo in the seed is a placeholder drawn for this build. Replace `scripts/assets/streamspace-logo.svg` with the real logo for the Live brand criterion.
 - Phase 1: API routes are left out of `proxy.ts`, because the proxy buffers request bodies up to 10 MB and would cut off document uploads. Route handlers refresh the session themselves.
+- Phase 1: a magic link returns to the address the person signed in from. The app sends `/auth/confirm?next=…` on that origin as the redirect, and the email template uses it, falling back to the site URL when Auth doesn't accept it. Redirects after confirm and sign-out use the Host header, since `request.url` says localhost in development.
+- Phase 1: for trying the dev server on a phone, the local Auth allow list and `allowedDevOrigins` accept `*.local` names, and the browser's Supabase client swaps a loopback Supabase address for the page's host. Auth never redirects to non-loopback IP addresses, so an IP can't be used.
 
 ## Phase 2
 

@@ -149,7 +149,9 @@ enabled = true
 # in emails.
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
+# A phone on the same network can try the dev server through this Mac's .local name. Auth never
+# redirects to an IP address other than loopback, so 192.168.x.x addresses can't be used.
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**", "http://*.local:3000/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).

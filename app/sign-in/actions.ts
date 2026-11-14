@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import { createUserClient } from "@/lib/supabase/server";
-import { safeNextPath } from "@/lib/auth";
+import { safeNextPath, signInRedirect } from "@/lib/auth";
 import { requestOrigin } from "@/lib/request";
 
 export type SignInState = { status: "idle" | "sent" | "error"; message: string };
@@ -16,7 +16,7 @@ export async function requestMagicLink(_prev: SignInState, form: FormData): Prom
   const db = await createUserClient();
   const { error } = await db.auth.signInWithOtp({
     email: parsed.data,
-    options: { shouldCreateUser: false, emailRedirectTo: `${origin}${next}` },
+    options: { shouldCreateUser: false, emailRedirectTo: signInRedirect(origin, next) },
   });
   if (error && /rate|too many|seconds/i.test(error.message)) {
     return { status: "error", message: "Too many sign-in requests. Wait a minute and try again." };

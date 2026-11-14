@@ -2,7 +2,7 @@
 
 **All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no model key or Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
 
-Last checked on 14 November 2026: `npm run check` passes (type check, lint, 92 Vitest tests in 12 files) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
+Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 Vitest tests in 13 files) and `npm run e2e` passes (20 Playwright tests) while `npm run dev` is running.
 
 ## What's built
 
@@ -25,7 +25,7 @@ Needs Node 20.9 or later, Docker running, and the Supabase CLI (built with 2.75)
 
 ```bash
 npm install
-supabase start                 # local Postgres, Auth, Storage, Realtime and the mail inbox
+supabase start -x studio,imgproxy,vector,logflare,supavisor,edge-runtime   # Postgres, Auth, Storage, Realtime and the mail inbox; -x skips services the app doesn't use
 supabase status -o env         # copy the URL and keys into .env.local (see .env.example)
 npm run db:reset               # rebuild and seed: "Seeded 2 organizations, 2 courses, 4 sessions and 16 users"
 npm run seed:demo              # seven submitted interviews on Session 1 (3 named, 3 anonymous, 1 private)
@@ -34,6 +34,8 @@ npm run jobs                   # optional: run the scheduled work once (reminder
 ```
 
 Sign in at `http://localhost:3000/streamspace/sign-in` with a seeded address and open the link from the local inbox at `http://localhost:54324`. Everyone is fictional; addresses use the reserved `.example` domain.
+
+**Trying it on a phone.** Phone and computer must be on the same network. Open the app on the computer at its `.local` name rather than `localhost` (find the name with `scutil --get LocalHostName`, then use `http://<name>.local:3000`), sign in there, and the session page's QR code points at that address. The learner's sign-in email links back to the same address, and the phone can read the local inbox at `http://<name>.local:54324`. An IP address such as `192.168.1.20` doesn't work: Supabase Auth refuses to redirect to IP addresses other than loopback. iPhones resolve `.local` names; some Android phones don't. Voice needs HTTPS on a phone, so over the local network the interview is typed only.
 
 | Who | Address | Role |
 | --- | --- | --- |
