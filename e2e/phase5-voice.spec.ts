@@ -27,6 +27,10 @@ async function installFakeVoice(page: Page, opts: { refuseMicrophone?: boolean }
       let query: ((q: string) => Promise<string>) | null = null;
       const fake = {
         spoken: [] as string[],
+        readAloud: [] as string[],
+        async sendAction(action: string, payload?: { text?: string }) {
+          if (action === "read_aloud") fake.readAloud.push(payload?.text ?? "");
+        },
         on(event: string, h: (e: unknown) => void) {
           (handlers[event] ??= []).push(h);
         },
@@ -64,20 +68,32 @@ test("the microphone asks for permission, spoken turns appear marked with a micr
   await page.getByTestId("mic-button").click();
   await expect(page.getByTestId("mic-button")).toHaveAttribute("data-state", "on");
   expect(await page.evaluate(() => (window as unknown as { __micRequests: number }).__micRequests)).toBeGreaterThan(0);
+  const readAloud = () => page.evaluate(() => (window as unknown as { __fakeVoice: { readAloud: string[] } }).__fakeVoice.readAloud);
+  // The question waiting on screen is read aloud as soon as voice starts.
+  await expect.poll(readAloud).toHaveLength(1);
+  expect((await readAloud())[0]).toContain("Could you now do what this session taught");
 
   const reply = await page.evaluate(() => (window as unknown as { __fakeVoice: { say: (t: string) => Promise<string> } }).__fakeVoice.say("Yes, with the guide beside me"));
   expect(reply).toMatch(/pace/i);
+  // The reply is spoken as the turn's answer, so it isn't read aloud a second time.
+  await expect(page.getByTestId("interviewer-bubble").last()).toContainText(/pace/i);
+  expect(await readAloud()).toHaveLength(1);
+
+  // A chip tap while listening: its next question is read aloud.
+  await page.getByTestId("rating-chip").filter({ hasText: "About right" }).click();
+  await expect(page.getByTestId("interviewer-bubble").last()).toContainText("How much of this session will you use in your work?");
+  await expect.poll(async () => (await readAloud()).at(-1)).toContain("How much of this session will you use in your work?");
+  await page.getByTestId("mic-button").click();
   const spoken = page.getByTestId("learner-bubble").filter({ hasText: "Yes, with the guide beside me" });
   await expect(spoken).toHaveAttribute("data-mode", "voice");
   await expect(spoken.getByLabel("Spoken")).toBeVisible();
 
   // Back to typing: the same interview continues with the next item.
-  await page.getByTestId("mic-button").click();
-  await page.getByLabel("Your answer").fill("About right");
+  await page.getByLabel("Your answer").fill("Most of it");
   await page.getByRole("button", { name: "Send" }).click();
-  const typed = page.getByTestId("learner-bubble").filter({ hasText: "About right" });
+  const typed = page.getByTestId("learner-bubble").filter({ hasText: "Most of it" });
   await expect(typed).toHaveAttribute("data-mode", "text");
-  await expect(page.getByTestId("interviewer-bubble").last()).toContainText("How much of this session will you use in your work?");
+  await expect(page.getByTestId("interviewer-bubble").last()).toContainText(/recommend/i);
 });
 
 test("with the microphone refused the chat still works and shows a notice", async ({ page }) => {

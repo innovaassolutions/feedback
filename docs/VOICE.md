@@ -6,6 +6,8 @@
 
 What is in place (2026-11-15): Todd's account key is in `.env.local`, the agent below exists, and the app's own token call (`mintVoiceToken`) gets a token for it. Everything below is how the integration is built and what to check when the trial is run.
 
+**First attempt (2026-11-15), stopped after 54 seconds: the agent never spoke.** Vocal Bridge's call log showed the learner's words reaching the app (`query_agent`) and the app's reply (the first rating question) coming back 0.4 seconds later, but no text-to-speech in the call's usage: the agent had been created without `model_settings`. Nothing was spoken at the start either, because the agent had no greeting and nothing asked it to read the waiting question. Both are fixed (the table below) and the trial needs running again.
+
 ## How voice works in the app
 
 - The chat window has a microphone button (`components/interview/voice.tsx`). Voice and typing share one interview, one transcript and one Interviewer.
@@ -14,6 +16,7 @@ What is in place (2026-11-15): Todd's account key is in `.env.local`, the agent 
 - That route (`get_voice_token`) checks the interview token cookie (401 without it) and mints a short-lived token from `https://vocalbridgeai.com/api/v1/token` with `X-API-Key: VOCAL_BRIDGE_API_KEY` and, if set, `X-Agent-Id: VOCAL_BRIDGE_AGENT_ID`. The key is read only in `lib/server/voice.ts`.
 - The participant name sent to Vocal Bridge is decided on the server: "Learner" for anonymous and private interviews, the learner's first name for named ones.
 - Vocal Bridge runs in its AI Agent mode. Each transcribed utterance arrives through `onAIAgentQuery`; the app sends it to `send_turn` with `mode: "voice"` and returns the Interviewer's reply text, which Vocal Bridge speaks. Live `transcript` events for the learner fill a provisional chat bubble while they speak.
+- Any question the agent hasn't already spoken as a reply (the one waiting when voice starts, or the next one after a chip tap) is sent with the `read_aloud` client action. A reply to a spoken turn is never sent twice.
 - Spoken turns are stored as text with `mode = 'voice'` and shown with a microphone mark. No audio is written to the database or to Storage.
 - If the token can't be minted or the connection fails, the button turns off and a notice says voice isn't available.
 
@@ -30,7 +33,12 @@ What is in place (2026-11-15): Todd's account key is in `.env.local`, the agent 
 | `greeting` | None | The Interviewer's opening message comes from the app |
 | `background_enabled`, `web_search_enabled` | `false` | Vocal Bridge must not answer anything itself |
 | `hold`, `transfer`, `hangup`, DTMF, `debug_mode` | `false` | Not needed on the web |
-| Call recording / audio retention | Not exposed by the API at creation. To check in the dashboard during the trial | The plan wants no audio kept |
+| `model_settings.llm` | `anthropic:claude-haiku-4-5` | The agent's own model only relays, so speed matters. Without settings it used gpt-5-mini, which reasoned for 5 seconds before passing on one sentence |
+| `model_settings.stt` | AssemblyAI universal streaming, English, end-of-turn threshold 0.5 | Vocal Bridge's defaults |
+| `model_settings.tts` | ElevenLabs `eleven_flash_v2_5`, the default library voice | The fastest voice. **An agent created through the API without `model_settings` has no voice at all**: the first trial heard nothing |
+| `model_settings.audio` | Thinking sound on, ambient off | A soft sound while the Interviewer writes its reply |
+| `builtin_tools_config.client_actions` | `read_aloud`, app to agent, behaviour `respond` | The app sends the question waiting on screen when voice starts, and the next question after a chip tap, so the learner isn't left in silence. The agent's prompt says to speak it exactly |
+| Call recording / audio retention | **On**: the first trial call has a recording (`has_recording: true`). The API's settings list has no recording option | The plan wants no audio kept. Turn it off in the Vocal Bridge dashboard if it allows that, and record the answer here |
 | Transcript retention on Vocal Bridge's side | To check in the dashboard during the trial | |
 | Language | Vocal Bridge's default (English) | The plan's default |
 

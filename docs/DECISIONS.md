@@ -86,6 +86,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 5: `VOCAL_BRIDGE_API_URL` overrides the Vocal Bridge address; tests point it at an unreachable port, so they never call the service.
 - Phase 5: the voice button has a test seam, `window.__vocalBridgeFactory`, so the browser test can stand in for Vocal Bridge. It does nothing unless a script sets it.
 - Phase 5: the Vocal Bridge agent was created through Vocal Bridge's REST API (`POST /api/v1/agents`, what `vb agent create` calls), since the CLI is pip-only. It is web-only, "Focused" style, AI Agent delegation to the browser, verbatim; `docs/VOICE.md` lists every setting.
+- Phase 5: a question the agent hasn't spoken as a reply (the one waiting when voice starts, or the next after a chip tap) goes to Vocal Bridge as a `read_aloud` client action (app to agent, `respond`). In AI Agent mode the agent otherwise only speaks in answer to the learner, and the first trial was silent from the start. The agent also got explicit `model_settings`: created through the API without them, it had no voice.
 
 ## Phase 6
 

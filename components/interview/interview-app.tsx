@@ -261,6 +261,7 @@ export function InterviewApp(props: {
           {props.voiceEnabled ? (
             <VoiceButton
               interviewId={interview.id}
+              currentPrompt={[...messages].reverse().find((m) => m.role === "interviewer")?.text ?? null}
               onPartial={setLivePartial}
               onUtterance={async (spoken) => {
                 setLivePartial("");
