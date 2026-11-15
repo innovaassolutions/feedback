@@ -117,6 +117,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 7: approving an earlier theme restores it; there is no separate restore operation.
 - Phase 7: organization creation and course creation are server actions on `/platform` and `/[org]/settings/courses`, since the plan lists no API operation for them.
 - Phase 7: organization addresses can't use reserved paths (`platform`, `sign-in`, `auth`, `api`, …).
+- Phase 7: the header shows the organization's logo on its own, without the name beside it, because a logo already carries the name. The logo's alt text is the name, so the home link is still announced by name. The name appears as text only when there is no logo. A logo that is only an icon would therefore show no name; if that matters, the brand settings could gain a "show the name beside the logo" option.
 
 ## Phase 8
 

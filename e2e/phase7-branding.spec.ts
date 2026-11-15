@@ -44,6 +44,9 @@ test("a platform admin creates a third organization, previews and approves its t
   await page.reload();
   await expect(page.getByTestId("org-header")).toHaveCSS("background-color", rgb("#1b4f8a"));
   await expect(page.getByTestId("org-logo")).toBeVisible();
+  // The logo stands for the name: it isn't repeated as text beside it, and the link is still named.
+  await expect(page.getByTestId("org-header").getByText("Harbour Learning", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("org-header").getByRole("link", { name: "Harbour Learning" })).toBeVisible();
 
   // A session, then invite a learner.
   await page.getByLabel("Title").fill("Welcome");
