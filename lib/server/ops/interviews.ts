@@ -386,7 +386,11 @@ export async function getVoiceToken(ctx: Ctx, input: OperationInput<"get_voice_t
   try {
     return await mintVoiceToken(participant, iv.id, fetcher);
   } catch (err) {
-    if (err instanceof VoiceUnavailable) throw new HttpError(502, "Voice isn't available right now. You can keep typing.");
+    if (err instanceof VoiceUnavailable) {
+      // The reason only (a timeout, a status code): never anything the learner said.
+      console.warn(`[voice-token] ${err.message}`);
+      throw new HttpError(502, "Voice isn't available right now. You can keep typing.");
+    }
     throw err;
   }
 }

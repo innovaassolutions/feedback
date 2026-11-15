@@ -11,6 +11,12 @@ export class VoiceUnavailable extends Error {
   }
 }
 
+/**
+ * Minting a token also dispatches the agent, so it is slow: 4 to 5 seconds normally, and over 8
+ * just after the agent is redeployed (the second trial failed at 8). 20 seconds leaves room.
+ */
+const TOKEN_TIMEOUT_MS = 20_000;
+
 export function voiceConfigured(): boolean {
   return Boolean(process.env.VOCAL_BRIDGE_API_KEY);
 }
@@ -27,7 +33,7 @@ export async function mintVoiceToken(participantName: string, sessionId: string,
       method: "POST",
       headers,
       body: JSON.stringify({ participant_name: participantName, session_id: sessionId }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
   } catch {
     throw new VoiceUnavailable("The voice service can't be reached");
