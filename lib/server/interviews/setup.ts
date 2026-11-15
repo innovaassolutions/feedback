@@ -53,6 +53,22 @@ export async function loadSetup(db: AdminClient, iv: InterviewRow): Promise<Engi
   };
 }
 
+/** A gap with no activity counts for at most this long towards the interview's time limit. */
+export const IDLE_CAP_SECONDS = 300;
+
+/**
+ * Time spent in the interview, for its time limit. A learner who leaves and comes back later isn't
+ * already at time: a resumed voice trial was wrapped up on its first answer, 37 minutes after it
+ * started. The engine measures from `startedAt`, so this returns a start that far back from now.
+ */
+export function activeTime(iv: Pick<InterviewRow, "started_at" | "last_activity_at">, progress: Progress, now: Date): { startedAt: Date; activeSeconds: number } {
+  const last = Date.parse(iv.last_activity_at);
+  const before = progress.active_seconds ?? Math.max(0, (last - Date.parse(iv.started_at)) / 1000);
+  const gap = Math.min(Math.max(0, (now.getTime() - last) / 1000), IDLE_CAP_SECONDS);
+  const activeSeconds = Math.round(before + gap);
+  return { startedAt: new Date(now.getTime() - activeSeconds * 1000), activeSeconds };
+}
+
 export async function loadState(db: AdminClient, iv: InterviewRow): Promise<EngineState & { lastSeq: number }> {
   const [{ data: turns }, { data: ratings }] = await Promise.all([
     db.from("interview_turns").select("seq, role, text, stage").eq("interview_id", iv.id).order("seq"),

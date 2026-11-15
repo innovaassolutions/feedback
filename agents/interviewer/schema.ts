@@ -36,6 +36,8 @@ export type Progress = {
   questions_raised: number;
   /** The learner turn at which the read-back began, for the rubric's limits check. */
   read_back_turn?: number | null;
+  /** Seconds spent in the interview so far. The time limit counts these, not the time since it started. */
+  active_seconds?: number;
 };
 
 export const STAGE_LABEL: Record<Stage, string> = {

@@ -25,7 +25,7 @@ import {
 import type { Progress, Stage } from "@/agents/interviewer/schema";
 import { STAGE_LABEL } from "@/agents/interviewer/schema";
 import { authorizeInterview, hashToken, interviewCookie, newToken, TOKEN_MAX_AGE } from "@/lib/server/interviews/token";
-import { loadGuide, loadSetup, loadState, actionsBefore, type InterviewRow } from "@/lib/server/interviews/setup";
+import { activeTime, loadGuide, loadSetup, loadState, actionsBefore, type InterviewRow } from "@/lib/server/interviews/setup";
 import { isEnrolled, kickJobs } from "./common";
 import { followUpWindow } from "@/lib/server/follow-up";
 
@@ -189,14 +189,16 @@ export async function sendTurn(ctx: Ctx, input: OperationInput<"send_turn">) {
   if (turnCount > hardLimit(setup)) throw conflict("This interview has reached its limit. Check the summary and submit it.");
 
   const agent = loadAgentFile("interviewer");
+  const clock = activeTime(iv, state.progress, ctx.now());
   const result = await handleLearnerTurn(
     { model: languageModel("interviewer"), instructions: agent.instructions },
     setup,
-    { ...state, turnCount },
+    { ...state, turnCount, startedAt: clock.startedAt },
     input.text,
     input.mode,
     ctx.now(),
   );
+  result.progress.active_seconds = clock.activeSeconds;
 
   const topic = state.progress.current_topic ?? state.progress.current_item;
   await appendTurns(ctx, iv, state.lastSeq, [
@@ -249,6 +251,7 @@ export async function saveRating(ctx: Ctx, input: OperationInput<"save_rating">)
   const ratings = { ...state.ratings, [item.id]: input.choice };
 
   const step = handleChip(setup, state, item.id, input.choice);
+  step.progress.active_seconds = activeTime(iv, state.progress, ctx.now()).activeSeconds;
   const label = [...item.choices, { id: "prefer_not_to_say", label: "Prefer not to say" }].find((c) => c.id === input.choice)!.label;
   let reply: string | null = step.reply;
   let stage = step.stage;

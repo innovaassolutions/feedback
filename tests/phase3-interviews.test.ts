@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { sendTurn, saveRating, startInterview, submitInterview } from "@/lib/server/ops/interviews";
 import { INTERVIEWER_TOOL_NAMES } from "@/agents/interviewer/tools";
 import { languageModel, overrideStubBrain, reasoningLevel } from "@/lib/server/ai/models";
-import { handleChip, handleLearnerTurn, initialProgress, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
+import { handleChip, handleLearnerTurn, initialProgress, UPDATED_ON_SCREEN, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
 import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 import { seeded, sql, userId } from "./support/db";
 import { ctxAs, statusOf } from "./support/ctx";
@@ -127,6 +127,47 @@ describe("send_turn", () => {
     expect(await statusOf(sendTurn(stranger, { interview_id: interview.id, text: "hello", mode: "text" }))).toBe(401);
     stranger.jar.set([...owner.jar.keys()][0], "not-the-token");
     expect(await statusOf(sendTurn(stranger, { interview_id: interview.id, text: "hello", mode: "text" }))).toBe(401);
+  });
+
+  it("confirms a spoken correction at the read-back briefly, instead of reading the whole summary again", async () => {
+    const s = await openSession("Spoken correction");
+    const { ctx, interview } = await interviewToReadBack("hamish", s.id, "anonymous");
+    const typed = await sendTurn(ctx, { interview_id: interview.id, text: "Point two should say the pace was fine.", mode: "text" });
+    expect(typed.reply.text).toMatch(/^I've updated the summary\. Here's what I heard/);
+    const spoken = await sendTurn(ctx, { interview_id: interview.id, text: "Also remove the last point.", mode: "voice" });
+    expect(spoken.reply.text).toBe(UPDATED_ON_SCREEN);
+    expect(spoken.interview.stage).toBe("read_back");
+  });
+
+  it("counts time spent in the interview, so a learner who comes back later isn't already at time", async () => {
+    // A model that never moves on: only the time limit can end the conversation.
+    overrideStubBrain("interviewer", (call) =>
+      call.context.stage === "read_back"
+        ? { text: JSON.stringify({ points: ["One", "Two", "Three"] }) }
+        : { text: JSON.stringify({ reply: "Tell me more?", topic_action: "stay", learner_declined: false, offered_to_post_question: false }) },
+    );
+    let now = new Date();
+    const s = await openSession("Come back later");
+    const ctx = await ctxAs("grace", { now: () => now });
+    let { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+    interview = (await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" })).interview;
+    for (const item of ["ability", "pace", "relevance", "recommend"]) {
+      interview = (await saveRating(ctx, { interview_id: interview.id, item_id: item, choice: "prefer_not_to_say" })).interview;
+    }
+    // Away for 40 minutes, then back: the gap counts as five.
+    now = new Date(now.getTime() + 40 * 60_000);
+    let turn = await sendTurn(ctx, { interview_id: interview.id, text: "The practice was the most useful part.", mode: "text" });
+    expect(turn.interview.stage).toBe("conversation");
+    // Steady use still meets the 15-minute limit: 5 + 4.9 + 4.9 minutes, then the next turn is at time.
+    for (let i = 0; i < 2; i++) {
+      now = new Date(now.getTime() + 4.9 * 60_000);
+      turn = await sendTurn(ctx, { interview_id: interview.id, text: `More detail ${i}`, mode: "text" });
+      expect(turn.interview.stage).toBe("conversation");
+    }
+    now = new Date(now.getTime() + 4.9 * 60_000);
+    turn = await sendTurn(ctx, { interview_id: interview.id, text: "And one more thing.", mode: "text" });
+    expect(turn.interview.stage).toBe("read_back");
+    expect(turn.reply.text).toMatch(/^We're at time/);
   });
 
   it("moves to the read-back at turn 14 and returns 409 past the hard limit", async () => {

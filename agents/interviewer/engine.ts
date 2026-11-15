@@ -213,6 +213,9 @@ export async function readBack(deps: ModelDeps, setup: EngineSetup, history: Tur
   }
 }
 
+/** The reply to a spoken correction at the read-back. */
+export const UPDATED_ON_SCREEN = "I've updated the summary on your screen. Change anything that's still wrong there, then submit.";
+
 function readBackReply(points: string[]): string {
   return `Here's what I heard. ${points.map((p, i) => `${i + 1}. ${p}`).join(" ")} Check these on the summary screen, change anything that's wrong, then submit.`;
 }
@@ -301,7 +304,9 @@ export async function handleLearnerTurn(
     const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
     const points = await readBack(deps, setup, history, learnerText, progress.proposed_summary, runs);
     progress.proposed_summary = points;
-    return { reply: `I've updated the summary. ${readBackReply(points)}`, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+    // Spoken, the whole summary after every correction took half a minute each time; it's on screen.
+    const reply = spoken ? UPDATED_ON_SCREEN : `I've updated the summary. ${readBackReply(points)}`;
+    return { reply, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
   }
 
   if (limitReached(setup, state, now)) {
