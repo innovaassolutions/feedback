@@ -16,7 +16,12 @@ export type TurnOutput = z.infer<typeof turnOutputSchema>;
 /** The read-back: three to five points for the learner to check. */
 export const readBackSchema = z.object({
   points: z.array(z.string().min(3).max(400)).min(1).max(5),
+  /** For the learner's reply to the summary: "correction" changes it, "other" is anything else. */
+  request: z.enum(["correction", "other"]).default("correction"),
+  /** For "other": a short answer to what the learner said. */
+  reply: z.string().max(400).nullable().default(null),
 });
+export type ReadBackOutput = z.infer<typeof readBackSchema>;
 
 export const STAGES = ["consent", "ratings", "conversation", "read_back", "done"] as const;
 export type Stage = (typeof STAGES)[number];

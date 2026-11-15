@@ -1,7 +1,7 @@
 import { gateway } from "@ai-sdk/gateway";
 import { wrapLanguageModel } from "ai";
 import type { EmbeddingModelV4, LanguageModelV4, LanguageModelV4CallOptions } from "@ai-sdk/provider";
-import { aiProvider, embeddingModelId, modelIdFor, type AgentName } from "./provider";
+import { aiProvider, embeddingModelId, modelIdFor, voiceModelId, type AgentName } from "./provider";
 import { stubEmbeddingModel, stubLanguageModel, type StubBrain } from "./stub-model";
 import { STUB_BRAINS } from "./stub-brains";
 
@@ -43,6 +43,12 @@ function withReasoning(model: LanguageModelV4): LanguageModelV4 {
     model,
     middleware: { specificationVersion: "v4", transformParams: async ({ params }) => ({ ...params, reasoning: params.reasoning ?? reasoning }) },
   });
+}
+
+/** The Interviewer's model for a turn: the voice model for spoken turns. The stub serves both. */
+export function interviewerModel(voice: boolean): { model: LanguageModelV4; id: string } {
+  if (aiProvider() === "stub" || !voice) return { model: languageModel("interviewer"), id: modelIdFor("interviewer") };
+  return { model: withReasoning(gateway.languageModel(voiceModelId())), id: voiceModelId() };
 }
 
 export function embeddingModel(): EmbeddingModelV4 {

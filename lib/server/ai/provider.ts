@@ -28,6 +28,16 @@ export function modelIdFor(agent: AgentName): string {
   return process.env[AGENT_ENV[agent]] || process.env.AI_MODEL || "anthropic/claude-sonnet-5.5";
 }
 
+/**
+ * The Interviewer's model for spoken turns. A learner on voice hears nothing until the reply is
+ * written, so this can be a faster model than the one for typed turns. AI_MODEL_INTERVIEWER_VOICE
+ * sets it; otherwise it is the Interviewer's own model.
+ */
+export function voiceModelId(): string {
+  if (aiProvider() === "stub") return "stub/interviewer";
+  return process.env.AI_MODEL_INTERVIEWER_VOICE || modelIdFor("interviewer");
+}
+
 export function embeddingModelId(): string {
   if (aiProvider() === "stub") return "stub/embedding";
   return process.env.AI_EMBEDDING_MODEL || "openai/text-embedding-3-small";

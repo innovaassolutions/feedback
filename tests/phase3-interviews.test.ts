@@ -1,7 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { sendTurn, saveRating, startInterview, submitInterview } from "@/lib/server/ops/interviews";
 import { INTERVIEWER_TOOL_NAMES } from "@/agents/interviewer/tools";
-import { languageModel, overrideStubBrain, reasoningLevel } from "@/lib/server/ai/models";
+import { interviewerModel, languageModel, overrideStubBrain, reasoningLevel } from "@/lib/server/ai/models";
+import { voiceModelId } from "@/lib/server/ai/provider";
 import { handleChip, handleLearnerTurn, initialProgress, UPDATED_ON_SCREEN, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
 import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 import { seeded, sql, userId } from "./support/db";
@@ -127,6 +128,28 @@ describe("send_turn", () => {
     expect(await statusOf(sendTurn(stranger, { interview_id: interview.id, text: "hello", mode: "text" }))).toBe(401);
     stranger.jar.set([...owner.jar.keys()][0], "not-the-token");
     expect(await statusOf(sendTurn(stranger, { interview_id: interview.id, text: "hello", mode: "text" }))).toBe(401);
+  });
+
+  it("answers a request at the read-back that isn't a correction, and leaves the summary as it was", async () => {
+    const s = await openSession("Start again");
+    const { ctx, interview } = await interviewToReadBack("diego", s.id, "anonymous");
+    const before = await sql()`select progress->'proposed_summary' as points from public.interviews where id = ${interview.id}`;
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "Can we start the interview again?", mode: "voice" });
+    expect(turn.reply.text).toMatch(/can't start the interview again/i);
+    expect(turn.interview.stage).toBe("read_back");
+    const after = await sql()`select progress->'proposed_summary' as points from public.interviews where id = ${interview.id}`;
+    expect(after[0].points).toEqual(before[0].points);
+  });
+
+  it("keeps the summary when the model calls a reply other but changes the points anyway", async () => {
+    const s = await openSession("Other with changes");
+    const { ctx, interview } = await interviewToReadBack("elena", s.id, "anonymous");
+    const before = await sql()`select progress->'proposed_summary' as points from public.interviews where id = ${interview.id}`;
+    overrideStubBrain("interviewer", () => ({ text: JSON.stringify({ points: ["Something the learner never said."], request: "other", reply: "Happy to help." }) }));
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "Thanks, that was quick.", mode: "text" });
+    expect(turn.reply.text).toBe("Happy to help.");
+    const after = await sql()`select progress->'proposed_summary' as points from public.interviews where id = ${interview.id}`;
+    expect(after[0].points).toEqual(before[0].points);
   });
 
   it("confirms a spoken correction at the read-back briefly, instead of reading the whole summary again", async () => {
@@ -382,6 +405,27 @@ describe("the model's reasoning", () => {
     } finally {
       if (before === undefined) delete process.env.AI_REASONING;
       else process.env.AI_REASONING = before;
+    }
+  });
+});
+
+describe("the voice model", () => {
+  it("is AI_MODEL_INTERVIEWER_VOICE for spoken turns when set, and the Interviewer's own model otherwise", () => {
+    const keep = { provider: process.env.AI_PROVIDER, voice: process.env.AI_MODEL_INTERVIEWER_VOICE, model: process.env.AI_MODEL_INTERVIEWER };
+    try {
+      process.env.AI_PROVIDER = "gateway";
+      process.env.AI_MODEL_INTERVIEWER = "anthropic/claude-sonnet-5.5";
+      delete process.env.AI_MODEL_INTERVIEWER_VOICE;
+      expect(voiceModelId()).toBe("anthropic/claude-sonnet-5.5");
+      process.env.AI_MODEL_INTERVIEWER_VOICE = "anthropic/claude-haiku-5.5";
+      expect(voiceModelId()).toBe("anthropic/claude-haiku-5.5");
+      expect(interviewerModel(true).id).toBe("anthropic/claude-haiku-5.5");
+      expect(interviewerModel(false).id).toBe("anthropic/claude-sonnet-5.5");
+    } finally {
+      for (const [k, v] of [["AI_PROVIDER", keep.provider], ["AI_MODEL_INTERVIEWER_VOICE", keep.voice], ["AI_MODEL_INTERVIEWER", keep.model]] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
     }
   });
 });

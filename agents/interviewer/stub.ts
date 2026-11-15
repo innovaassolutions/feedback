@@ -73,11 +73,16 @@ export function interviewerStub(call: StubCall): StubReply {
     const learnerTurns = call.prompt
       .filter((m) => m.role === "user")
       .map((m) => (typeof m.content === "string" ? m.content : m.content.map((p) => ("text" in p ? p.text : "")).join("")))
-      .filter((s) => s.length > 12 && !/summari[sz]e/i.test(s));
+      .filter((s) => s.length > 12 && !/summari[sz]e|^My reply to the summary/i.test(s));
     const points = learnerTurns.slice(-5).map((s) => `You said ${s.replace(/\s+/g, " ").replace(/[.!?]*$/, "").slice(0, 160).replace(/^I /, "you ")}.`);
     while (points.length < 3) points.push(points.length === 0 ? "You shared your views on the session." : "You had nothing more to add.");
-    if (ctx.correction && points.length) points[points.length - 1] = `Correction: ${String(ctx.correction).slice(0, 200)}`;
-    return { text: JSON.stringify({ points: points.slice(0, 5) }) };
+    const reply = typeof ctx.learner_reply === "string" ? ctx.learner_reply : null;
+    const previous = Array.isArray(ctx.previous_summary) ? (ctx.previous_summary as string[]) : null;
+    if (reply && previous && /\b(start|begin)\b.*\bagain\b|\brestart\b|\bstart over\b/i.test(reply)) {
+      return { text: JSON.stringify({ points: previous, request: "other", reply: "I can't start the interview again, but you can change any point on the summary screen before you submit." }) };
+    }
+    if (reply && points.length) points[points.length - 1] = `Correction: ${reply.slice(0, 200)}`;
+    return { text: JSON.stringify({ points: points.slice(0, 5), request: "correction", reply: null }) };
   }
 
   if (ctx.stage === "ratings") {

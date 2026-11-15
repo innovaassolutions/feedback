@@ -68,10 +68,14 @@ async function runPersona(persona: Persona) {
   };
   const transcript: TranscriptTurn[] = [{ role: "interviewer", text: opening, stage: "consent" }];
   let index = 0;
+  // How long the learner waits for each reply: the Interviewer's whole turn, model calls included.
+  const latencies: number[] = [];
   while (state.stage !== "read_back" && state.turnCount < hardLimit(setup)) {
     const said = await learnerSays(persona, transcript, index++);
     const turnCount = state.turnCount + 1;
+    const started = performance.now();
     const result = await handleLearnerTurn(deps, setup, { ...state, turnCount }, said, "text", new Date());
+    latencies.push(performance.now() - started);
     transcript.push({ role: "learner", text: said, stage: state.stage }, { role: "interviewer", text: result.reply, stage: result.stage });
     state = {
       ...state,
@@ -86,7 +90,7 @@ async function runPersona(persona: Persona) {
   const judged = await judgeTranscript(languageModel("judge"), transcript, state.progress.proposed_summary);
   const results: RubricResult[] = [...code, ...judged.results];
   if (judged.error) results.push({ item: "read_back_matches", passed: false, method: "judge", note: `Judge failed: ${judged.error}` });
-  return { persona: persona.id, turns: state.turnCount, reached_read_back: state.stage === "read_back", results, transcript };
+  return { persona: persona.id, turns: state.turnCount, reached_read_back: state.stage === "read_back", results, transcript, latencies };
 }
 
 async function runLabelled() {
@@ -138,6 +142,10 @@ for (const p of PERSONAS) {
 }
 const all = personas.flatMap((p) => p.results);
 const rubricRate = all.length ? all.filter((r) => r.passed).length / all.length : 0;
+const waits = personas.flatMap((p) => p.latencies).sort((a, b) => a - b);
+const pct = (q: number) => (waits.length ? Math.round(waits[Math.min(waits.length - 1, Math.floor(q * waits.length))]) : 0);
+const latency = { turns: waits.length, median_ms: pct(0.5), p90_ms: pct(0.9), max_ms: pct(1) };
+console.log(`  Interviewer reply time: median ${(latency.median_ms / 1000).toFixed(1)} s, 90th percentile ${(latency.p90_ms / 1000).toFixed(1)} s over ${latency.turns} turns`);
 const themes = await runLabelled();
 console.log(`  themes: ${(themes.agreement * 100).toFixed(1)}% agreement over ${themes.decisions} decisions`);
 
@@ -146,6 +154,7 @@ const report = {
   provider: stub ? "stub" : "gateway",
   valid_for_gate: !stub,
   models: { interviewer: modelIdFor("interviewer"), analyst: modelIdFor("analyst"), judge: modelIdFor("judge") },
+  interviewer_latency: latency,
   versions,
   judge_version: JUDGE_VERSION,
   rubric: {

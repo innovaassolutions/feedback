@@ -5,7 +5,7 @@ import { conflict, forbidden, HttpError, notFound, unprocessable } from "@/lib/s
 import { mintVoiceToken, VoiceUnavailable } from "@/lib/server/voice";
 import { choicesFor, isValidChoice } from "@/lib/guide";
 import type { Json } from "@/lib/database.types";
-import { languageModel } from "@/lib/server/ai/models";
+import { interviewerModel, languageModel } from "@/lib/server/ai/models";
 import { modelIdFor } from "@/lib/server/ai/provider";
 import { loadAgentFile } from "@/lib/server/ai/agent-file";
 import { recordRun } from "@/lib/server/ai/runs";
@@ -66,7 +66,7 @@ export function publicInterview(iv: InterviewRow, setup: EngineSetup, ratings: R
   };
 }
 
-async function writeRuns(ctx: Ctx, iv: InterviewRow, runs: RunRecord[], version: string) {
+async function writeRuns(ctx: Ctx, iv: InterviewRow, runs: RunRecord[], version: string, model = modelIdFor("interviewer")) {
   for (const r of runs) {
     await recordRun(
       ctx.admin,
@@ -74,7 +74,7 @@ async function writeRuns(ctx: Ctx, iv: InterviewRow, runs: RunRecord[], version:
         organizationId: iv.organization_id,
         agent: "interviewer",
         agentVersion: version,
-        model: modelIdFor("interviewer"),
+        model,
         operation: r.operation,
         interviewId: iv.id,
         sessionId: iv.session_id,
@@ -190,8 +190,9 @@ export async function sendTurn(ctx: Ctx, input: OperationInput<"send_turn">) {
 
   const agent = loadAgentFile("interviewer");
   const clock = activeTime(iv, state.progress, ctx.now());
+  const turnModel = interviewerModel(input.mode === "voice");
   const result = await handleLearnerTurn(
-    { model: languageModel("interviewer"), instructions: agent.instructions },
+    { model: turnModel.model, instructions: agent.instructions },
     setup,
     { ...state, turnCount, startedAt: clock.startedAt },
     input.text,
@@ -215,7 +216,7 @@ export async function sendTurn(ctx: Ctx, input: OperationInput<"send_turn">) {
     .single();
   if (error || !updated) throw conflict("This interview changed in another window. Reload the page.");
   await applyEffects(ctx, iv, result);
-  await writeRuns(ctx, iv, result.runs, agent.version);
+  await writeRuns(ctx, iv, result.runs, agent.version, turnModel.id);
   if (result.effects.length) kickJobs(ctx);
   const ratings = { ...state.ratings, ...Object.fromEntries(result.ratingsToSave.map((r) => [r.item_id, r.choice])) };
   return { reply: { role: "interviewer", text: result.reply, mode: "text" } as ChatMessage, interview: publicInterview(updated, setup, ratings) };
@@ -259,7 +260,7 @@ export async function saveRating(ctx: Ctx, input: OperationInput<"save_rating">)
   if (step.needsReadBack) {
     const runs: RunRecord[] = [];
     const agent = loadAgentFile("interviewer");
-    progress.proposed_summary = await readBack({ model: languageModel("interviewer"), instructions: agent.instructions }, setup, state.history, null, null, runs);
+    progress.proposed_summary = await readBack({ model: languageModel("interviewer"), instructions: agent.instructions }, setup, state.history, runs);
     stage = "read_back";
     progress.read_back_turn ??= iv.turn_count;
     reply = `Here's what I heard: ${progress.proposed_summary.join(" ")}`;

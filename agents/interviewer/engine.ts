@@ -3,7 +3,7 @@ import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { choicesFor, isValidChoice, PREFER_NOT_TO_SAY, type GuidePart, type RatingItem, type Topic } from "@/lib/guide";
 import { errorName } from "@/lib/server/ai/runs";
 import { interviewerTools, type ToolEffect } from "./tools";
-import { readBackSchema, turnOutputSchema, type Progress, type Stage, type TurnOutput } from "./schema";
+import { readBackSchema, turnOutputSchema, type Progress, type ReadBackOutput, type Stage, type TurnOutput } from "./schema";
 
 // The Interviewer, as code and model together. Code decides the stage, counts turns and time,
 // tracks topics and checks every tool effect. The model writes the questions and follow-ups.
@@ -190,28 +190,38 @@ async function modelTurn(
   }
 }
 
-export async function readBack(deps: ModelDeps, setup: EngineSetup, history: Turn[], correction: string | null, previous: string[] | null, runs: RunRecord[]): Promise<string[]> {
+/** Writes the read-back, or (with the learner's reply to it) revises it. Null when the model's output fails. */
+async function readBackCall(deps: ModelDeps, setup: EngineSetup, history: Turn[], learnerReply: string | null, previous: string[] | null, runs: RunRecord[]): Promise<ReadBackOutput | null> {
   const started = performance.now();
   const transcript = history.filter((t) => t.stage === "conversation" || t.stage === "read_back");
   try {
     const result = await generateText({
       model: deps.model,
-      instructions: deps.instructions + contextBlock(setup, { stage: "read_back", previous_summary: previous, correction }),
-      messages: toMessages(
-        transcript,
-        correction ? `Please update the summary. ${correction}` : "Please summarise what you heard in three to five points.",
-      ),
+      instructions: deps.instructions + contextBlock(setup, { stage: "read_back", previous_summary: previous, learner_reply: learnerReply }),
+      // The learner's words go in as a reply to the summary, not as "update the summary": a request
+      // to start again used to be folded into the points as if it were a correction.
+      messages: toMessages(transcript, learnerReply ? `My reply to the summary: ${learnerReply}` : "Please summarise what you heard in three to five points."),
       output: Output.object({ schema: readBackSchema }),
       maxOutputTokens: 700,
     });
+    const out = readBackSchema.parse(result.output);
     runs.push({ operation: "read_back", usage: result.totalUsage, providerMetadata: result.providerMetadata, latencyMs: performance.now() - started, outcome: "ok" });
-    return readBackSchema.parse(result.output).points;
+    return out;
   } catch (err) {
     runs.push({ operation: "read_back", latencyMs: performance.now() - started, outcome: "validation_failed", error: errorName(err) });
-    // A plain fallback the learner can edit, so the interview can still be submitted.
-    return previous ?? ["Thanks for your feedback. Add or edit points here before you submit."];
+    return null;
   }
 }
+
+export async function readBack(deps: ModelDeps, setup: EngineSetup, history: Turn[], runs: RunRecord[]): Promise<string[]> {
+  const out = await readBackCall(deps, setup, history, null, null, runs);
+  // A plain fallback the learner can edit, so the interview can still be submitted.
+  return out?.points ?? ["Thanks for your feedback. Add or edit points here before you submit."];
+}
+
+/** The answer to anything at the read-back that isn't a correction, when the model gives none. */
+export const ON_SCREEN_HELP = "You can change or remove any point on the summary screen, then submit.";
+const COULD_NOT_UPDATE = "Sorry, I couldn't change that. You can edit the points on the summary screen, then submit.";
 
 /** The reply to a spoken correction at the read-back. */
 export const UPDATED_ON_SCREEN = "I've updated the summary on your screen. Change anything that's still wrong there, then submit.";
@@ -281,7 +291,7 @@ export async function handleLearnerTurn(
 
   const toReadBack = async (lead: string): Promise<EngineResult> => {
     const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
-    const points = await readBack(deps, setup, history, null, null, runs);
+    const points = await readBack(deps, setup, history, runs);
     progress.proposed_summary = points;
     progress.current_topic = null;
     progress.current_item = null;
@@ -301,8 +311,11 @@ export async function handleLearnerTurn(
   }
 
   if (state.stage === "read_back") {
-    const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
-    const points = await readBack(deps, setup, history, learnerText, progress.proposed_summary, runs);
+    const out = await readBackCall(deps, setup, state.history, learnerText, progress.proposed_summary, runs);
+    if (!out) return { reply: COULD_NOT_UPDATE, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+    // Not a correction (a question, "can we start again?"): the summary stays exactly as it was.
+    if (out.request === "other") return { reply: out.reply?.trim() || ON_SCREEN_HELP, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+    const points = out.points;
     progress.proposed_summary = points;
     // Spoken, the whole summary after every correction took half a minute each time; it's on screen.
     const reply = spoken ? UPDATED_ON_SCREEN : `I've updated the summary. ${readBackReply(points)}`;
