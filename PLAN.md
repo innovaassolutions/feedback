@@ -286,8 +286,8 @@ Write `agents/interviewer/AGENT.md`, `agents/analyst/AGENT.md` and the default g
 - [x] Analyst stub tests: a quote that isn't in the learner's turns is dropped, and a theme outside the list is retried once and then marks the interview `needs_review`
 - [x] Stub model test: when the learner agrees, `raise_question` stores an open question on the session. Without agreement nothing is stored
 - [x] Browser: rating choices show as chips, a progress marker shows the stage, and the summary screen lets the learner edit points and change the anonymity level before submitting
-- [ ] Live: a full interview on Session 1 finishes in under eight minutes, the read-back mentions a topic from the session brief, and the insights name at least one theme
-- [ ] Live: `npm run evals` scores at least 90% on the rubric across the eight personas and 85% agreement on the twelve labelled transcripts, and saves its report
+- [x] Live: a full interview on Session 1 finishes in under eight minutes, the read-back mentions a topic from the session brief, and the insights name at least one theme
+- [x] Live: `npm run evals` scores at least 90% on the rubric across the eight personas and 85% agreement on the twelve labelled transcripts, and saves its report
 - [x] `npm run check` passes
 
 ## Phase 4: The feedback dashboard
@@ -335,7 +335,7 @@ Add `list_questions`, `ask_question`, `vote_question`, `answer_question` and `ad
 - [x] An instructor verifies an AI answer, and the label changes to "Answered by instructor". An instructor can also edit it, replace it, or delete the question. A learner calling `answer_question` gets 403
 - [x] The dashboard gains a Q&A tile: open against answered, the median time to an answer, and how many questions went to the instructor
 - [ ] Live: asking "How do I find my project ID?" on Session 1 returns an answer that points to the address bar and cites the rebuild guide
-- [ ] Live: after adding `docs.streamspace.ai`, asking "How do I publish a new version of a workflow?" returns an answer that cites a documentation page
+- [x] Live: after adding `docs.streamspace.ai`, asking "How do I publish a new version of a workflow?" returns an answer that cites a documentation page
 - [x] `npm run check` passes
 
 ## Phase 7: Branding and a new tenant

@@ -1,8 +1,8 @@
 # Status
 
-**All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no AI Gateway key yet, the voice trials need a person speaking (the Vocal Bridge key and agent are now set up), and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
+**All eight phases are built.** 80 of the plan's 85 criteria are verified and ticked. The five that aren't are Live criteria: two voice trials need a person speaking (the Vocal Bridge key and agent are set up and checked), and three need the client's real Session 1 rebuild guide or Streamspace logo. See [Not yet verified](#not-yet-verified).
 
-Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 Vitest tests in 13 files) and `npm run e2e` passes (22 Playwright tests) while `npm run dev` is running.
+Last checked on 15 November 2026: `npm run check` passes (type check, lint, 107 Vitest tests in 13 files) and `npm run e2e` passes (22 Playwright tests) while `npm run dev` is running. `npm run evals` passes against the real model (rubric 100%, themes 95.8%).
 
 ## What's built
 
@@ -17,7 +17,7 @@ Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 V
 | 7. Branding and a new tenant | The Brand designer, contrast adjustment, the preview and approval page, theme history, organization and course creation |
 | 8. Quality, reminders and follow-up | `agent_runs` for every agent call, the rubric job, the quality page, alerts, the review queue and labelled-set candidates, the eval merge gate in CI, reminders, the follow-up interview, retention and a learner's removal request |
 
-The four product agents are in `agents/`, each with `AGENT.md` (version 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits and topic tracking (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
+The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.5.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
 
 ## How to run it
 
@@ -47,7 +47,7 @@ Sign in at `http://localhost:3000/streamspace/sign-in` with a seeded address and
 | Owen Marsh | owen.marsh@northwind.example | Northwind organization admin and instructor |
 | Isla Brennan, Kofi Mensah, Lena Vogel | first.last@northwind.example | Northwind learners |
 
-**Without `AI_GATEWAY_API_KEY`, every agent runs on its built-in stub**: simple, rule-based behaviour that follows each `AGENT.md` closely enough to exercise the real code around it. Add a gateway key and set the model ids (`AI_MODEL`, optionally per agent) to use real models. The default id `anthropic/claude-sonnet-5.5` should be checked against the gateway's model list.
+**Without `AI_GATEWAY_API_KEY`, every agent runs on its built-in stub**: simple, rule-based behaviour that follows each `AGENT.md` closely enough to exercise the real code around it. With a gateway key the agents use real models: `anthropic/claude-sonnet-5.5` by default and `openai/text-embedding-3-small` for embeddings, both checked against the gateway's model list. The gateway's free tier allows neither, so it needs credits. `AI_REASONING` sets how much the model reasons before answering (default `minimal`). In development an edit to an `AGENT.md` applies without restarting `npm run dev`.
 
 ## Tests
 
@@ -68,7 +68,20 @@ npm run evals:gate -- --base origin/main   # what CI runs: every changed AGENT.m
 
 `npm run evals` plays eight scripted learner personas against the real Interviewer and scores each transcript on the rubric (limits and coverage in code, the rest by a judge model), then runs the Analyst on twelve hand-labelled transcripts. Pass marks: 90% of rubric items, 85% theme agreement. Reports go to `evals/reports/` with every agent's `AGENT.md` version.
 
-**Latest eval results: no real-model run yet**, because there was no model key. The stub dry run scored 92.9% on the rubric and 86.5% theme agreement; that only shows the harness works and says nothing about the real agents. Stub reports are ignored by git and by the gate.
+**Latest eval results (15 November 2026, Claude Sonnet 5.5 through the AI Gateway): rubric 100% (44 of 44 items), themes 95.8%**, for Interviewer 1.5.0 and Analyst 1.0.0, scored by judge 1.1.0. The report is `evals/reports/2026-11-15T05-08-25-564Z-model-interviewer-1.5.0-analyst-1.0.0.json`. Stub reports are ignored by git and by the gate.
+
+The Interviewer took six versions to get there. Every report is kept in `evals/reports/`:
+
+| Interviewer | Rubric | What the run showed, and what changed next |
+| --- | --- | --- |
+| 1.0.0 | 67.6% | The model's reasoning used up the 600-token turn budget, turns failed, and a failed turn could still end the interview. Reasoning set to minimal; each stage offers only its own tools; the last step offers none; a failed turn can't end the interview; one blocker per turn |
+| 1.1.0 | 78.6% | `end_interview` called after ordinary answers. It now also needs `learner_asked_to_stop` in the reply; follow-ups only while every topic can still be reached |
+| 1.2.0 | 75.7% | The judge itself failed on three personas (its 300-character reason limit), fixed in judge 1.1.0. The Interviewer told learners "last time you said…" |
+| 1.3.0 | 78.6% | Six failures, all on describing the last session's change, which the judge reads as leading |
+| 1.4.0 | 97.7% | Passed, but a live run sent blocker alerts with the summary "placeholder". A blocker alert now also needs `learner_is_blocked` in the reply and a real summary |
+| 1.5.0 | 100% | |
+
+Theme agreement stayed between 93.8% and 95.8% on Analyst 1.0.0 throughout.
 
 ## Deploying
 
@@ -84,14 +97,18 @@ Not done in this build (it needs Todd's accounts). The steps:
 
 | Criterion | Why not | What it needs |
 | --- | --- | --- |
-| Phase 2, Live: the drafted brief from the Session 1 rebuild guide names Get Document Data, Core Agent and Link Generator | No model key; the real rebuild guide isn't in the repository | A gateway key, then upload the guide to Session 1 as an instructor and read the draft on the admin session page |
-| Phase 3, Live: a full interview on Session 1 in under eight minutes, mentioning a brief topic, with themes | No model key | A gateway key; run an interview as a seeded learner |
-| Phase 3, Live: `npm run evals` meets both pass marks | No model key | A gateway key; `npm run evals`, then commit the report |
+| Phase 2, Live: the drafted brief from the Session 1 rebuild guide names Get Document Data, Core Agent and Link Generator | The real rebuild guide isn't in the repository | Upload the guide to Session 1 as an instructor and read the draft on the admin session page |
 | Phase 5, Live first: the voice trial | Needs a person speaking. The key, the agent and token minting are in place and checked | Run the trial in `docs/VOICE.md` on `localhost:3000` |
 | Phase 5, Live: a full voice interview in Chrome on a laptop and in a phone browser | Needs a person speaking; the phone also needs HTTPS | As above, on both devices (the phone needs the app reachable over HTTPS) |
-| Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | No model key; no real rebuild guide | A gateway key and the guide on Session 1 |
-| Phase 6, Live: an answer citing `docs.streamspace.ai` | No model key | A gateway key; add the site as Dana under Admin → Product documentation, then ask on Session 1 |
-| Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | No model key; the seeded logo is a placeholder | A gateway key and the real logo, uploaded on `/streamspace/settings/brand` |
+| Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | The real rebuild guide isn't in the repository | The guide on Session 1, then ask the question as a learner |
+| Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | The seeded logo is a placeholder | The real logo, uploaded on `/streamspace/settings/brand` |
+
+Live criteria verified on 15 November 2026 against `npm run dev` and the real model:
+- **Phase 3, a full interview.** A scripted learner took Session 1 in a browser, typing instantly. On Interviewer 1.5.0 it covered every topic in 0.4 minutes with model replies of 2–5 seconds. The read-back named Get Document Data, Core Agent, Link Generator and the project ID, the insights named four themes, and no blocker alert went out. A person typing would take a few minutes.
+- **Phase 3, the evals.** See [Evals](#evals).
+- **Phase 6, documentation.** `docs.streamspace.ai` was read as 38 pages. "How do I publish a new version of a workflow?" got an AI answer citing three sections of its "Test, Debug & Publish Workflows" page, each marked Documentation. The first read failed because one page holds a NUL character, which Postgres text can't store; fixed in `lib/server/librarian/chunk.ts`.
+
+These runs added invented learners (Jonah Ellery, Rowan Pike, Tessa Lund, Noel Brandt) to the local database only, because every seeded learner had already given Session 1 feedback there. `npm run db:reset` removes them.
 
 Verified with a stand-in rather than the real service: Phase 5's browser criterion (microphone permission, spoken turns as microphone-marked bubbles, switching back to typing) ran in Chromium with a fake microphone and a stand-in for the Vocal Bridge client. The real service is covered by the two Live voice criteria above.
 
@@ -99,7 +116,7 @@ Verified with a stand-in rather than the real service: Phase 5's browser criteri
 
 - `main` holds the first commit (`PLAN.md`, `CLAUDE.md`). `build` holds the phase commits. A local `prototype` branch keeps the earlier "Session Feedback" app that was in the folder.
 - `main` and `build` are pushed to `github.com/innovaassolutions/feedback`; `main` is the default branch. The `prototype` branch stays local.
-- The first CI run on `build` (run 43597848050) showed the eval gate working: the "Eval report for every changed `AGENT.md`" job failed, naming all four agents at 1.0.0 with no passing real-model report. It stays red until `npm run evals` runs with a model key and the report is committed.
+- The first CI run on `build` (run 43597848050) showed the eval gate working: the "Eval report for every changed `AGENT.md`" job failed, naming all four agents at 1.0.0 with no passing real-model report. The 15 November report passes the gate for all four agents (`npm run evals:gate -- --base origin/main`).
 - That run's check job also failed, for a different reason: CI installed the latest Supabase CLI (3.1), which no longer accepts the `[inbucket]` section of `supabase/config.toml`. CI now pins the CLI to 2.75.0, the version this repository was built and tested with.
 - The code for all eight phases was written before the local database finished downloading (about 90 minutes on this connection), then verified together. The phase commits group the files by phase, so only the last commit, which is the verified tree, is guaranteed to pass `npm run check` and `npm run e2e` on its own.
 
@@ -107,7 +124,7 @@ Verified with a stand-in rather than the real service: Phase 5's browser criteri
 
 **What was built.** Everything in the plan's eight phases: the multi-tenant app on Next.js and Supabase with Row Level Security on every table, four agents behind the Vercel AI SDK with versioned instructions, schemas, stubs and evals, the dashboard, Q&A, voice, branding, quality monitoring, reminders, the follow-up interview and retention.
 
-**Still unverified.** The eight Live criteria in the table above. Each needs an AI Gateway key, a person to run the voice trial, or the client's real files.
+**Still unverified.** The five Live criteria in the table above. Two need a person to run the voice trial; three need the client's real rebuild guide or logo.
 
 **Decisions.** About 70 choices the plan didn't make are in `docs/DECISIONS.md`. The ones Todd is most likely to want to revisit:
 - one instructor per seeded organization doubles as its admin;
@@ -125,5 +142,5 @@ Verified with a stand-in rather than the real service: Phase 5's browser criteri
 
 **Known risks.**
 - An instructor reading interviews directly through Supabase's REST API (bypassing the app) still can't see names or times on anonymous rows, or anything below the group-size threshold. But the raw API returns rows in storage order, which loosely follows when they were last written. The app sorts anonymous transcripts by content and then shuffles them, so its own output carries no ordering; a determined instructor using the raw API might infer some.
-- The stub model is rule-based. Nothing about the real agents' quality is known until the evals run.
-- The Vocal Bridge integration is built from the published `@vocalbridgeai/sdk` 0.1.1 API and hasn't met the real service.
+- The stub model is rule-based and never misuses a tool. The real model did, in ways only real runs found: reflexive tool calls, dummy arguments, and ending interviews nobody asked to end. The Interviewer's engine now double-checks every consequential tool call. The Brand designer (1.0.0) hasn't met the real model yet, and the Librarian has only been seen answering from documentation.
+- The Vocal Bridge integration is built from the published `@vocalbridgeai/sdk` 0.1.1 API. The real service mints tokens for the app's agent, but no one has spoken to it yet.
