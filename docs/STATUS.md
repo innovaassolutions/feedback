@@ -17,7 +17,7 @@ Last checked on 15 November 2026: `npm run check` passes (type check, lint, 107 
 | 7. Branding and a new tenant | The Brand designer, contrast adjustment, the preview and approval page, theme history, organization and course creation |
 | 8. Quality, reminders and follow-up | `agent_runs` for every agent call, the rubric job, the quality page, alerts, the review queue and labelled-set candidates, the eval merge gate in CI, reminders, the follow-up interview, retention and a learner's removal request |
 
-The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.7.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
+The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.8.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
 
 ## How to run it
 
@@ -68,7 +68,7 @@ npm run evals:gate -- --base origin/main   # what CI runs: every changed AGENT.m
 
 `npm run evals` plays eight scripted learner personas against the real Interviewer and scores each transcript on the rubric (limits and coverage in code, the rest by a judge model), then runs the Analyst on twelve hand-labelled transcripts. Pass marks: 90% of rubric items, 85% theme agreement. Reports go to `evals/reports/` with every agent's `AGENT.md` version.
 
-**Latest eval results (15 November 2026, Claude Sonnet 5.5 through the AI Gateway): rubric 97.7%, themes 95.8%, median Interviewer reply 2.9 s (90th percentile 6.2 s)**, for Interviewer 1.7.0 and Analyst 1.0.0, scored by judge 1.1.0. The report is `evals/reports/2026-11-15T09-45-19-824Z-model-interviewer-1.7.0-analyst-1.0.0.json`. Reports now include the Interviewer's reply time. Stub reports are ignored by git and by the gate.
+**Latest eval results (15 November 2026, Claude Sonnet 5.5 through the AI Gateway): rubric 97.7%, themes 95.8%, median Interviewer reply 2.4 s (90th percentile 6.4 s)**, for Interviewer 1.8.0 and Analyst 1.0.0, scored by judge 1.1.0. The report is `evals/reports/2026-11-15T10-02-10-215Z-model-interviewer-1.8.0-analyst-1.0.0.json`. Reports now include the Interviewer's reply time. Stub reports are ignored by git and by the gate.
 
 The Interviewer took six versions to pass, and has changed since after voice trials. Every report is kept in `evals/reports/`:
 
@@ -82,6 +82,7 @@ The Interviewer took six versions to pass, and has changed since after voice tri
 | 1.5.0 | 100% | The voice trial showed requests at the read-back ("can we start again?") folded into the summary. The read-back now tells corrections from anything else |
 | 1.6.0 | 97.7% | Also run with Claude Haiku 5.5 for speed: 83.7%, so voice stays on Sonnet 5.5. A voice trial then showed "I don't understand the question" skipping the item, a complaint saved as "Prefer not to say", and a summary about the interview itself after an early stop |
 | 1.7.0 | 97.7% | A rating question the learner didn't understand is explained once more, and no rating is saved on that turn. The confused beginner now asks once: the explanation worked, but with two explanations and a Q&A offer the persona reached the 14-turn limit before the last topic, its one miss |
+| 1.8.0 | 97.7% | Short sentences, common words and no idioms, for learners with English as a second language. The one miss moved to the non-native persona, which reached the 14-turn limit before the last topic |
 
 Theme agreement stayed between 93.8% and 95.8% on Analyst 1.0.0 throughout.
 
@@ -101,6 +102,7 @@ Not done in this build (it needs Todd's accounts). The steps:
 | --- | --- | --- |
 | Phase 2, Live: the drafted brief from the Session 1 rebuild guide names Get Document Data, Core Agent and Link Generator | The real rebuild guide isn't in the repository | Upload the guide to Session 1 as an instructor and read the draft on the admin session page |
 | Phase 5, Live first: the voice trial | Needs a person speaking. The key, the agent and token minting are in place and checked | Run the trial in `docs/VOICE.md` on `localhost:3000` |
+| Voice pace for learners with English as a second language (not a plan criterion) | The voice was changed on 15 November 2026 after measuring 231 words a minute, and no call has been made since | A voice call, then `npx tsx scripts/voice-pace.ts`: the median should be 150 or less |
 | Phase 5, Live: a full voice interview in Chrome on a laptop and in a phone browser | Needs a person speaking; the phone also needs HTTPS | As above, on both devices (the phone needs the app reachable over HTTPS) |
 | Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | The real rebuild guide isn't in the repository | The guide on Session 1, then ask the question as a learner |
 | Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | The seeded logo is a placeholder | The real logo, uploaded on `/streamspace/settings/brand` |

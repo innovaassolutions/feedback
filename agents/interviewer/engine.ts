@@ -81,7 +81,7 @@ const LEVEL_TEXT = {
 
 export function openingMessage(sessionTitle: string, anonymity: keyof typeof LEVEL_TEXT, kind: "session" | "follow_up"): string {
   const what = kind === "follow_up" ? "a short follow-up on how the course has helped at work" : `feedback on ${sessionTitle}`;
-  return `Thanks for giving ${what}. It takes five to eight minutes. You chose ${LEVEL_TEXT[anonymity]}. You can change that on the summary screen before you submit. Ready when you are.`;
+  return `Thanks for giving ${what}. It takes five to eight minutes. You chose ${LEVEL_TEXT[anonymity]}. You can change that on the summary screen before you submit. Tell me when you are ready to start.`;
 }
 
 export function ratingItem(setup: EngineSetup, id: string): RatingItem | undefined {
@@ -90,8 +90,20 @@ export function ratingItem(setup: EngineSetup, id: string): RatingItem | undefin
 
 export function ratingPrompt(item: RatingItem, spoken: boolean): string {
   if (!spoken) return item.prompt;
-  const choices = choicesFor(item).map((c) => c.label);
-  return `${item.prompt} You can say ${choices.slice(0, -1).join(", ")}, or ${choices[choices.length - 1]}.`;
+  return `${item.prompt} ${spokenChoices(item)}`;
+}
+
+/**
+ * The choices read aloud for learners who may speak English as a second language. Each is its own
+ * short sentence, because the voice pauses at a full stop and ran a comma-separated list together at
+ * over 200 words a minute. A 0 to 10 scale is read as its range, not as eleven numbers.
+ */
+export function spokenChoices(item: RatingItem): string {
+  const labels = item.choices.map((c) => c.label);
+  const numbers = labels.map(Number);
+  const scale = labels.length > 2 && numbers.every((n, i) => Number.isInteger(n) && (i === 0 || n === numbers[i - 1] + 1));
+  const options = scale ? [`a number from ${labels[0]} to ${labels[labels.length - 1]}`] : labels;
+  return `You can say: ${options.join(". ")}. Or prefer not to say.`;
 }
 
 function topicOf(setup: EngineSetup, id: string | null): Topic | undefined {
@@ -387,7 +399,8 @@ export async function handleLearnerTurn(
         const choices = choicesFor(item).map((c) => c.label).join(", ");
         // The clarification must ask: a model reply without a question ("Thanks, that's clear.") left the
         // rating unsaved and the learner with nothing to answer.
-        const reply = output?.reply.includes("?") ? output.reply : `Thanks. Which of these is closest: ${choices}?`;
+        const fallback = spoken ? `Thanks. Which of these is closest? ${spokenChoices(item)}` : `Thanks. Which of these is closest: ${choices}?`;
+        const reply = output?.reply.includes("?") ? output.reply : fallback;
         return { reply, stage: "ratings", progress, ratingsToSave, effects, refused, runs };
       }
       // Asked once already: record it as skipped rather than push the learner.

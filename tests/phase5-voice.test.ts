@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { getVoiceToken, saveRating, sendTurn, startInterview } from "@/lib/server/ops/interviews";
+import { spokenChoices } from "@/agents/interviewer/engine";
+import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 import { sql } from "./support/db";
 import { ctxAs, statusOf } from "./support/ctx";
 import { openSession } from "./support/interview";
@@ -79,10 +81,15 @@ describe("spoken ratings", () => {
     const res = await sendTurn(ctx, { interview_id: interview.id, text: "Um, I'd say about right", mode: "voice" });
     expect(res.interview.ratings.pace).toBe("about_right");
     expect(res.interview.pending_rating?.id).toBe("relevance");
-    // In voice the Interviewer reads the choices out.
-    expect(res.reply.text).toMatch(/You can say Most of it, Some of it, A little, None yet, or Prefer not to say/);
+    // In voice the Interviewer reads the choices out, one short sentence each, so the voice pauses between them.
+    expect(res.reply.text).toMatch(/You can say: Most of it\. Some of it\. A little\. None yet\. Or prefer not to say\.$/);
     const [turn] = await sql()`select mode, text from public.interview_turns where interview_id = ${interview.id} and role = 'learner' order by seq desc limit 1`;
     expect(turn).toEqual({ mode: "voice", text: "Um, I'd say about right" });
+  });
+
+  it("reads a 0 to 10 scale as its range, not as eleven numbers", () => {
+    const recommend = DEFAULT_SESSION_GUIDE.rating_items.find((r) => r.id === "recommend")!;
+    expect(spokenChoices(recommend)).toBe("You can say: a number from 0 to 10. Or prefer not to say.");
   });
 
   it("an unclear answer gets one clarifying question, and a second unclear one moves on", async () => {
