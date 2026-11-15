@@ -130,7 +130,9 @@ function contextBlock(setup: EngineSetup, extra: Record<string, unknown>): strin
     session: setup.sessionTitle,
     kind: setup.kind,
     brief: setup.brief,
-    changes_since_last_session: setup.actions,
+    // Feedback from the group, not from this learner: "you_said" led the model to tell learners
+    // "last time you said…" about things they never said.
+    changes_since_last_session: setup.actions.map((a) => ({ feedback_from_learners: a.you_said, what_changed: a.we_did })),
     learner_name: setup.learnerName,
     ...extra,
   };
@@ -138,6 +140,23 @@ function contextBlock(setup: EngineSetup, extra: Record<string, unknown>): strin
 }
 
 type ModelDeps = { model: LanguageModelV4; instructions: string };
+
+type ToolName = keyof ReturnType<typeof interviewerTools>;
+
+/**
+ * The tools a turn offers. Ratings are saved only while they're being asked, and raise_question
+ * is offered only on the turn after the Interviewer offered to post a question.
+ */
+function turnTools(stage: Stage, progress: Progress): ToolName[] {
+  if (stage === "ratings") return ["save_rating", "flag_blocker", "end_interview"];
+  return progress.last_offer ? ["raise_question", "flag_blocker", "end_interview"] : ["flag_blocker", "end_interview"];
+}
+
+/** A blocker summary that describes nothing. */
+const PLACEHOLDER = /^\s*(placeholder|tbd|todo|n\/?a|none|test|blocker|summary)\W*$/i;
+
+/** Tool steps before the model must answer. The last step offers no tools, so a turn always ends in a reply. */
+const TURN_STEPS = 3;
 
 async function modelTurn(
   deps: ModelDeps,
@@ -149,18 +168,22 @@ async function modelTurn(
 ): Promise<{ output: TurnOutput | null; effects: ToolEffect[] }> {
   const effects: ToolEffect[] = [];
   const started = performance.now();
+  const stageTools = turnTools(state.stage, state.progress);
   try {
     const result = await generateText({
       model: deps.model,
       instructions: deps.instructions + contextBlock(setup, extra),
       messages: toMessages(state.history, learnerText),
       tools: interviewerTools(effects),
+      activeTools: [...stageTools],
+      prepareStep: ({ stepNumber }) => (stepNumber >= TURN_STEPS - 1 ? { activeTools: [] } : {}),
       output: Output.object({ schema: turnOutputSchema }),
-      stopWhen: isStepCount(4),
+      stopWhen: isStepCount(TURN_STEPS),
       maxOutputTokens: 600,
     });
+    const output = turnOutputSchema.parse(result.output);
     runs.push({ operation: `turn:${state.stage}`, usage: result.totalUsage, providerMetadata: result.providerMetadata, latencyMs: performance.now() - started, outcome: "ok" });
-    return { output: turnOutputSchema.parse(result.output), effects };
+    return { output, effects };
   } catch (err) {
     runs.push({ operation: `turn:${state.stage}`, latencyMs: performance.now() - started, outcome: "validation_failed", error: errorName(err) });
     return { output: null, effects };
@@ -235,6 +258,24 @@ export async function handleLearnerTurn(
   const ratings = { ...state.ratings };
   const spoken = mode === "voice";
 
+  // A blocker alerts the instructor at once: at most one per turn and three per interview.
+  // It also needs the reply to say the learner is blocked, and a real description: a model called
+  // flag_blocker({ summary: "placeholder" }) for a problem the learner had already got past.
+  const acceptBlocker = (e: ToolEffect, output: TurnOutput | null) => {
+    const flaggedThisTurn = effects.some((x) => x.type === "flag_blocker");
+    const described = e.type === "flag_blocker" && !PLACEHOLDER.test(e.summary);
+    if (output?.learner_is_blocked && described && !flaggedThisTurn && progress.blockers_flagged < 3) {
+      effects.push(e);
+      progress.blockers_flagged++;
+    } else refused.push(e);
+  };
+  // Ending early needs the tool call and a valid reply that says the learner asked to stop. A real
+  // model called end_interview after ordinary answers; a failed turn never ends the interview.
+  const acceptEnding = (e: ToolEffect, output: TurnOutput | null) => {
+    if (output?.learner_asked_to_stop) effects.push(e);
+    else refused.push(e);
+  };
+
   const toReadBack = async (lead: string): Promise<EngineResult> => {
     const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
     const points = await readBack(deps, setup, history, null, null, runs);
@@ -279,6 +320,7 @@ export async function handleLearnerTurn(
       already_clarified: progress.clarified.includes(item.id),
     }, runs);
     let saved = false;
+    let ending = false;
     for (const e of asked) {
       if (e.type === "save_rating") {
         const target = ratingItem(setup, e.item_id);
@@ -288,18 +330,20 @@ export async function handleLearnerTurn(
           if (e.item_id === item.id) saved = true;
         } else refused.push(e);
       } else if (e.type === "flag_blocker") {
-        effects.push(e);
-        progress.blockers_flagged++;
+        acceptBlocker(e, output);
       } else if (e.type === "end_interview") {
-        effects.push(e);
-        return toReadBack("");
+        acceptEnding(e, output);
+        ending ||= effects.includes(e);
       } else refused.push(e);
     }
+    if (ending) return toReadBack("");
     if (!saved) {
       if (!progress.clarified.includes(item.id)) {
         progress.clarified.push(item.id);
         const choices = choicesFor(item).map((c) => c.label).join(", ");
-        const reply = output?.reply ?? `Sorry, I didn't quite catch that. Which is closest: ${choices}?`;
+        // The clarification must ask: a model reply without a question ("Thanks, that's clear.") left the
+        // rating unsaved and the learner with nothing to answer.
+        const reply = output?.reply.includes("?") ? output.reply : `Thanks. Which of these is closest: ${choices}?`;
         return { reply, stage: "ratings", progress, ratingsToSave, effects, refused, runs };
       }
       // Asked once already: record it as skipped rather than push the learner.
@@ -311,13 +355,17 @@ export async function handleLearnerTurn(
     }
     const step = advanceRatings(setup, progress, ratings, spoken);
     if (step.stage === "read_back") return toReadBack("Thanks.");
-    return { reply: `Thanks. ${step.prompt}`, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
+    // The first topic's opener already starts with thanks.
+    return { reply: /^thanks\b/i.test(step.prompt) ? step.prompt : `Thanks. ${step.prompt}`, stage: step.stage, progress, ratingsToSave, effects, refused, runs };
   }
 
   // Conversation.
   const current = topicOf(setup, progress.current_topic);
   const currentState = progress.topics.find((t) => t.id === progress.current_topic);
-  const followUpAvailable = currentState?.status === "asked";
+  // One follow-up per topic, and only while the turns left can still reach every pending topic.
+  const pendingAfterThis = progress.topics.filter((t) => t.status === "pending" && t.id !== progress.current_topic).length;
+  const roomForFollowUp = setup.limits.maxTurns - state.turnCount > pendingAfterThis;
+  const followUpAvailable = currentState?.status === "asked" && roomForFollowUp;
   const nextId = progress.topics.find((t) => t.status === "pending" && t.id !== progress.current_topic)?.id ?? null;
   const next = topicOf(setup, nextId);
   const { output, effects: asked } = await modelTurn(deps, setup, { ...state, progress }, learnerText, {
@@ -336,22 +384,16 @@ export async function handleLearnerTurn(
         progress.questions_raised++;
       } else refused.push(e);
     } else if (e.type === "flag_blocker") {
-      if (progress.blockers_flagged < 3) {
-        effects.push(e);
-        progress.blockers_flagged++;
-      } else refused.push(e);
+      acceptBlocker(e, output);
     } else if (e.type === "end_interview") {
-      effects.push(e);
-      ending = true;
-    } else if (e.type === "save_rating") {
-      const target = ratingItem(setup, e.item_id);
-      if (target && isValidChoice(target, e.choice)) {
-        ratings[e.item_id] = e.choice;
-        ratingsToSave.push({ item_id: e.item_id, choice: e.choice });
-      } else refused.push(e);
+      acceptEnding(e, output);
+      ending ||= effects.includes(e);
+    } else {
+      // Ratings are saved only in the ratings stage, so the learner's chip answers can't be overwritten.
+      refused.push(e);
     }
   }
-  if (ending) return toReadBack("Of course.");
+  if (ending) return toReadBack("Okay, let's stop there.");
 
   if (!output) {
     // The model's output failed validation: keep the interview moving with the next opener.

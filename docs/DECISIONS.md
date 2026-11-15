@@ -58,6 +58,15 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 3: the judge model that scores the rubric isn't one of the four product agents. Its instructions are in `lib/server/quality/rubric.ts` with their own version (`JUDGE_VERSION`), and its runs are recorded as agent `judge`.
 - Phase 3: a quote counts as word for word if it appears in a learner turn ignoring letter case, runs of spaces and curly quotes.
 - Phase 3: the eval report records every agent's AGENT.md version, so the merge gate can check any of them.
+- Phase 3: model reasoning defaults to `minimal` (`AI_REASONING` changes it) for every agent. On the first real-model runs Claude Sonnet 5.5 reasoned before answering, ran out of the fixed output budgets (the Interviewer's 600 tokens, the judge's 800) and failed the turn. `none` isn't available on Sonnet 5.5; `minimal` is its lowest level.
+- Phase 3: after the first real-model eval (rubric 67.6%), more Interviewer rules moved into code: each stage offers only its own tools (no `save_rating` in the conversation, so chip ratings can't be overwritten); a turn has three steps and the last offers no tools, so it always ends in a reply; at most one blocker per turn; and `end_interview` only counts from a turn that produced a valid reply. A failed turn had ended two eval interviews after one answer.
+- Phase 3: Interviewer `AGENT.md` 1.1.0 narrows a blocker to something the learner can't get past now (the model flagged "the settings were confusing"), calls `end_interview` only on an explicit request to stop, and asks about the last session's changes without suggesting they helped.
+- Phase 3: Interviewer 1.2.0, after 1.1.0 scored 78.6%. In code: `end_interview` also needs `learner_asked_to_stop` in the same reply (the model still ended two eval interviews after ordinary answers); `raise_question` is offered only on the turn after an offer; a follow-up is allowed only while the turns left can still reach every pending topic. In `AGENT.md`: no two questions joined by "or", the last session's changes asked as an open question (the default guide's opener changed to match), and no talk of tools to the learner. The judge's output budget went from 800 to 1500 tokens.
+- Phase 3: Interviewer 1.3.0, after 1.2.0 scored 75.7%. The context names the last session's changes as `feedback_from_learners` and `what_changed` instead of `you_said` and `we_did`: the model kept telling individual learners "last time you said…". `AGENT.md` frames them as the group's feedback and accepts "I can't compare". When a rating is unclear and the model's reply asks nothing, code asks which choice is closest.
+- Phase 3: rubric judge 1.1.0. Its reasons have no length limit in the schema (they are trimmed to 300 characters when stored), and it gets a second try. A reason over 300 characters used to throw the verdict away and count the interview as failed; three of eight personas in one run. The rubric items and their wording are unchanged.
+- Phase 3: Interviewer 1.4.0, after 1.3.0 scored 78.6% with six of its nine failures on one question. Every wording that described the last session's change (and the feedback behind it) was judged leading, because it suggests the change helped. The Interviewer now asks about the part of the session the change was meant to improve, without describing it ("How did you find the balance between explanation and practice this time?"). The answer still shows whether the change worked, and learners see what changed in the "You said, we did" list on the session page. The default guide's goal and opener for this topic changed to match.
+- Phase 3: Interviewer 1.5.0. 1.4.0 passed the evals (97.7%), but in a live run on `npm run dev` it sent two blocker alerts with the summary "placeholder" for a problem the learner had already got past. On Sonnet 5.5's lowest reasoning setting the model thinks only between tool calls, so a first tool call comes before any thinking. A blocker alert now needs the tool call, `learner_is_blocked` in the reply written after it, and a summary that isn't a placeholder.
+- Phase 3: in development `AGENT.md` files are read on every call, so an edit applies without restarting `npm run dev`. Production keeps them cached.
 
 ## Phase 4
 
@@ -86,6 +95,8 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 6: instructor-written and verified answers are indexed as sources by a background job, so the secret key stays in job code.
 - Phase 6: documentation pages belong to the organization and are searched for every course it runs. The crawler respects robots.txt, stays on the same host and under the address given, and stops at 500 pages.
 - Phase 6: votes are private to the voter; the count is kept on the question by a trigger.
+- Phase 6: the Librarian's last step offers no tools, so it answers from what it found. A real model searched six times and never answered.
+- Phase 6: text read from documents and documentation pages drops the control characters Postgres text can't hold. docs.streamspace.ai has a page with a NUL character, and the whole read failed with 22P05.
 
 ## Phase 7
 
@@ -109,6 +120,7 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 
 ## Proposed plan changes
 
+- Phase 3: the conversation topic "whether the last session's changes helped" pulls against "no leading questions". Asked that way it suggests the changes helped, and the rubric judge fails it. Suggest "how the last session's changes worked for the learner", which is what the Interviewer now asks. Many learners also can't compare with a session they missed, so the topic could be skipped for learners who didn't take the previous interview.
 - On Vercel a function's request body is limited to 4.5 MB, so `add_document` can't receive a 25 MB file there. Large uploads should go straight to Supabase Storage with a signed upload URL, and `add_document` should take the stored path. Locally the limit works as written.
 - `PLAN-EXPLORER.md` is referenced but wasn't supplied.
 - The tenancy criterion ("zero rows from every table") rules out a readable branding table; the plan could say that public branding comes from a function.

@@ -154,7 +154,8 @@ describe("You said, we did", () => {
     expect((iv.progress as { topics: Array<{ id: string }> }).topics.map((t) => t.id)).toContain("last_changes");
     await sendTurn(learner, { interview_id: interview.id, text: "Ready", mode: "text" });
     await sendTurn(learner, { interview_id: interview.id, text: "Yes, without help", mode: "text" });
-    expect(seen).toEqual([{ you_said: "The Core Agent part felt rushed", we_did: "We added a ten-minute recap" }]);
+    // Framed as the group's feedback, so the Interviewer doesn't tell this learner "you said".
+    expect(seen).toEqual([{ feedback_from_learners: "The Core Agent part felt rushed", what_changed: "We added a ten-minute recap" }]);
     overrideStubBrain("interviewer", null);
   });
 });

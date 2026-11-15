@@ -144,6 +144,19 @@ describe("the Librarian", () => {
     expect(marcus.outbox.some((e) => /question needs your answer/i.test(e.subject))).toBe(true);
   });
 
+  it("answers from what it found when the model would keep searching, because the last step offers no tools", async () => {
+    // A real model searched six times and never answered, so the question went to the instructor.
+    overrideStubBrain("librarian", (call) => {
+      if (call.toolNames.length) return { toolCalls: [{ name: "search_sources", input: { query: `project ID ${call.toolResults.length}` } }] };
+      const hits = call.toolResults.flatMap((r) => r.output as Array<{ id: string }>);
+      return { text: JSON.stringify({ answerable: true, answer: "It's in the address bar.", citations: hits.slice(0, 1).map((h) => h.id), sources_disagree: false }) };
+    });
+    const s = await sessionWithGuide("Searching too long");
+    const { question } = await askQuestion(await ctxAs("elena"), { session_id: s.id, text: "How do I find my project ID?", anonymous: true });
+    await marcus.runJobs();
+    expect((await stateOf(question.id)).state).toBe("ai_answered");
+  });
+
   it("names an agents-only source without a link", async () => {
     const s = await openSession("Agents only source");
     const notes = "# Instructor notes\n\nThe hidden diagnostics panel opens with Ctrl+Shift+D in the workflow editor.";
@@ -276,6 +289,18 @@ describe("documentation sites", () => {
     expect(after.get("/docs/accounts")).toBe(before.get("/docs/accounts"));
     const text = await sql()`select content from public.document_chunks where documentation_source_id = ${source.id} and page_url like '%/docs/billing'`;
     expect(text.map((t) => t.content).join(" ")).toContain("every two weeks");
+  });
+
+  it("stores a page whose title and text hold NUL characters, which Postgres text can't", async () => {
+    // docs.streamspace.ai has such a page: the whole read failed with 22P05 until they were removed.
+    pages["/stray/"] = page("Export\u0000 notes", "Exported text\u0000 with a stray NUL character, as PDF extraction and some sites produce.");
+    const owen = await ctxAs("owen");
+    const { source } = await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/stray/` });
+    await owen.runJobs();
+    const [row] = await sql()`select status, page_count from public.documentation_sources where id = ${source.id}`;
+    expect(row).toMatchObject({ status: "ready", page_count: 1 });
+    const [chunk] = await sql()`select title, content from public.document_chunks where documentation_source_id = ${source.id}`;
+    expect(chunk).toMatchObject({ title: "Export notes — Export notes", content: expect.stringContaining("Exported text with a stray NUL") });
   });
 });
 

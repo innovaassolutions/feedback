@@ -4,11 +4,19 @@ const TARGET = 1100;
 const MAX = 1600;
 
 /**
+ * Removes the control characters Postgres text can't hold (NUL fails with 22P05) or that carry
+ * no meaning. Real pages and PDF extraction both produce them. Tabs and line breaks stay.
+ */
+export function storableText(text: string): string {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+}
+
+/**
  * Splits text into chunks of about a thousand characters on paragraph boundaries, carrying
  * the latest heading so each chunk says what part of the document it came from.
  */
 export function chunkText(text: string): Chunk[] {
-  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs = storableText(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const chunks: Chunk[] = [];
   let heading: string | null = null;
   let current: string[] = [];

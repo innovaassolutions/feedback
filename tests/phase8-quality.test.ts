@@ -7,6 +7,9 @@ import { checkAlerts, scoreInterview } from "@/lib/server/quality/jobs";
 import { applyRetention, sendReminders } from "@/lib/server/schedule";
 import { seedDemoInterviews } from "@/lib/server/demo";
 import { STREAMSPACE_LEARNERS } from "@/lib/server/seed";
+import { loadAgentFile } from "@/lib/server/ai/agent-file";
+import { languageModel, overrideStubBrain } from "@/lib/server/ai/models";
+import { judgeTranscript } from "@/lib/server/quality/rubric";
 import type { Email } from "@/lib/server/email";
 import { admin, seeded, sql, userId } from "./support/db";
 import { ctxAs, statusOf } from "./support/ctx";
@@ -86,8 +89,9 @@ describe("the rubric job", () => {
 describe("the quality page", () => {
   it("shows each figure by agent and AGENT.md version, for the platform admin only", async () => {
     const q = await getQuality(await ctxAs("platformAdmin"));
-    const interviewer = q.rows.find((r) => r.agent === "interviewer")!;
-    expect(interviewer.version).toBe("1.0.0");
+    // Grouped by the version in AGENT.md that each run used.
+    const interviewer = q.rows.find((r) => r.agent === "interviewer" && r.version === loadAgentFile("interviewer").version)!;
+    expect(interviewer).toBeDefined();
     for (const key of ["runs", "validation_failure_rate", "rubric_pass_rate", "read_backs_confirmed_without_edits", "abandon_rate", "median_turns", "cost_per_interview_usd"] as const) {
       expect(interviewer[key], key).not.toBeNull();
     }
@@ -225,5 +229,27 @@ describe("retention", () => {
     const [b] = await sql()`select count(*)::int as n from public.interviews where id = ${anon.interview.id}`;
     const [c] = await sql()`select count(*)::int as n from public.questions where author_id = ${await userId("farid")}`;
     expect([a.n, b.n, c.n]).toEqual([0, 1, 0]);
+  });
+});
+
+describe("the rubric judge", () => {
+  it("keeps a verdict with a long reason, trimmed, and tries again once when its first answer is unusable", async () => {
+    let calls = 0;
+    const long = "The read-back follows the learner closely. ".repeat(20);
+    overrideStubBrain("judge", () => {
+      calls++;
+      if (calls === 1) return { text: "not a verdict" };
+      const v = { verdict: "pass", reason: long };
+      return { text: JSON.stringify({ one_question_per_turn: v, no_leading_questions: v, read_back_matches: v, decline_accepted: { verdict: "n/a", reason: "No decline" }, injection_ignored: { verdict: "n/a", reason: "None" } }) };
+    });
+    try {
+      const judged = await judgeTranscript(languageModel("judge"), [{ role: "interviewer", text: "What was most useful?", stage: "conversation" }, { role: "learner", text: "The practice.", stage: "conversation" }], ["You found the practice most useful."]);
+      expect(judged.error).toBeUndefined();
+      expect(calls).toBe(2);
+      expect(judged.results.map((r) => r.item)).toEqual(["one_question_per_turn", "no_leading_questions", "read_back_matches"]);
+      expect(judged.results.every((r) => r.passed && (r.note?.length ?? 0) === 300)).toBe(true);
+    } finally {
+      overrideStubBrain("judge", null);
+    }
   });
 });

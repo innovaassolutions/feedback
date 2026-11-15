@@ -30,7 +30,7 @@ export function interviewerTools(effects: ToolEffect[]) {
       },
     }),
     flag_blocker: tool({
-      description: "Tell the instructor at once about something stopping the learner from using what was taught.",
+      description: "Tell the instructor at once about something that stops the learner from using what was taught now and that they can't get past alone. Not for things that were hard but got solved.",
       inputSchema: z.object({ summary: z.string().min(3).max(300) }),
       execute: async ({ summary }) => {
         effects.push({ type: "flag_blocker", summary });
@@ -38,7 +38,7 @@ export function interviewerTools(effects: ToolEffect[]) {
       },
     }),
     end_interview: tool({
-      description: "The learner wants to stop. Move to the read-back.",
+      description: "Only when the learner has said they want to stop or finish now. Moves to the read-back.",
       inputSchema: z.object({}),
       execute: async () => {
         effects.push({ type: "end_interview" });

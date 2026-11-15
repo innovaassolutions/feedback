@@ -1,5 +1,6 @@
 import { gateway } from "@ai-sdk/gateway";
-import type { EmbeddingModelV4, LanguageModelV4 } from "@ai-sdk/provider";
+import { wrapLanguageModel } from "ai";
+import type { EmbeddingModelV4, LanguageModelV4, LanguageModelV4CallOptions } from "@ai-sdk/provider";
 import { aiProvider, embeddingModelId, modelIdFor, type AgentName } from "./provider";
 import { stubEmbeddingModel, stubLanguageModel, type StubBrain } from "./stub-model";
 import { STUB_BRAINS } from "./stub-brains";
@@ -18,7 +19,30 @@ export function languageModel(agent: AgentName): LanguageModelV4 {
     if (!brain) throw new Error(`No stub registered for ${agent}`);
     return stubLanguageModel(agent, brain);
   }
-  return gateway.languageModel(modelIdFor(agent));
+  return withReasoning(gateway.languageModel(modelIdFor(agent)));
+}
+
+type Reasoning = NonNullable<LanguageModelV4CallOptions["reasoning"]>;
+const REASONING_LEVELS: Reasoning[] = ["provider-default", "none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/**
+ * Every call's output budget is sized for the answer alone. A model that reasons first can spend
+ * the budget before it answers (the Interviewer's 600 tokens ran out mid-turn), and reasoning
+ * slows a live interview. So reasoning is kept to the minimum unless AI_REASONING asks for more.
+ * ("none" isn't available on Claude Sonnet 5.5: the gateway maps it to the lowest level with a warning
+ * on every call, and "minimal" reaches the same level without one.)
+ */
+export function reasoningLevel(): Reasoning {
+  const fromEnv = process.env.AI_REASONING as Reasoning | undefined;
+  return fromEnv && REASONING_LEVELS.includes(fromEnv) ? fromEnv : "minimal";
+}
+
+function withReasoning(model: LanguageModelV4): LanguageModelV4 {
+  const reasoning = reasoningLevel();
+  return wrapLanguageModel({
+    model,
+    middleware: { specificationVersion: "v4", transformParams: async ({ params }) => ({ ...params, reasoning: params.reasoning ?? reasoning }) },
+  });
 }
 
 export function embeddingModel(): EmbeddingModelV4 {

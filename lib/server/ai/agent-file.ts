@@ -19,8 +19,12 @@ export function parseAgentFile(raw: string): AgentFile {
   return { name: meta.agent ?? "", version: meta.version, instructions: m[2].trim() };
 }
 
+/**
+ * Cached in production, where an AGENT.md only changes with a deploy. In development it's read on
+ * every call, so an edit takes effect without restarting `npm run dev`.
+ */
 export function loadAgentFile(folder: AgentFolder): AgentFile {
-  const hit = cache.get(folder);
+  const hit = process.env.NODE_ENV === "production" ? cache.get(folder) : undefined;
   if (hit) return hit;
   const file = parseAgentFile(readFileSync(path.join(process.cwd(), "agents", folder, "AGENT.md"), "utf8"));
   cache.set(folder, file);

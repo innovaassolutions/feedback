@@ -1,7 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { sendTurn, saveRating, startInterview, submitInterview } from "@/lib/server/ops/interviews";
 import { INTERVIEWER_TOOL_NAMES } from "@/agents/interviewer/tools";
-import { overrideStubBrain } from "@/lib/server/ai/models";
+import { languageModel, overrideStubBrain, reasoningLevel } from "@/lib/server/ai/models";
+import { handleChip, handleLearnerTurn, initialProgress, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
+import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 import { seeded, sql, userId } from "./support/db";
 import { ctxAs, statusOf } from "./support/ctx";
 import { interviewToReadBack, LONG_ANSWERS, openSession, submit } from "./support/interview";
@@ -282,5 +284,157 @@ describe("blockers", () => {
     const mine = ctx.outbox.filter((e) => e.subject === `A learner is blocked after Session ${s.number}`);
     expect(mine.map((e) => e.to).sort()).toEqual(["dana.whitfield@streamspace.example", "marcus.lindqvist@streamspace.example"]);
     expect(mine[0].text).toContain("I still can't log in");
+  });
+
+  it("are flagged at most once per turn, however often the model calls flag_blocker", async () => {
+    overrideStubBrain("interviewer", (call) =>
+      call.toolResults.length
+        ? { text: JSON.stringify({ reply: "Sorry to hear that. What else?", topic_action: "stay", learner_declined: false, offered_to_post_question: false, learner_is_blocked: true }) }
+        : { toolCalls: [{ name: "flag_blocker", input: { summary: "Can't log in" } }, { name: "flag_blocker", input: { summary: "Still can't log in" } }] },
+    );
+    const { s, ctx, interview } = await toConversationAs("elena", "One blocker per turn");
+    await sendTurn(ctx, { interview_id: interview.id, text: "I still can't log in.", mode: "text" });
+    const jobs = await sql()`select count(*)::int as n from public.jobs where kind = 'notify_blocker' and payload->>'session_id' = ${s.id}`;
+    expect(jobs[0].n).toBe(1);
+  });
+
+  it("aren't sent when the reply doesn't confirm the learner is blocked, or the summary is a placeholder", async () => {
+    let blocked = false;
+    let summary = "Can't open the workspace";
+    overrideStubBrain("interviewer", (call) =>
+      call.toolResults.length
+        ? { text: JSON.stringify({ reply: "Thanks. What else?", topic_action: "stay", learner_declined: false, offered_to_post_question: false, learner_is_blocked: blocked }) }
+        : { toolCalls: [{ name: "flag_blocker", input: { summary } }] },
+    );
+    const { s, ctx, interview } = await toConversationAs("farid", "Unconfirmed blocker");
+    await sendTurn(ctx, { interview_id: interview.id, text: "I was stuck for a few minutes until someone helped.", mode: "text" });
+    blocked = true;
+    summary = "placeholder";
+    await sendTurn(ctx, { interview_id: interview.id, text: "Then it was fine.", mode: "text" });
+    const jobs = await sql()`select count(*)::int as n from public.jobs where kind = 'notify_blocker' and payload->>'session_id' = ${s.id}`;
+    expect(jobs[0].n).toBe(0);
+  });
+});
+
+/** Consent and four chip ratings, ending in the conversation stage. */
+async function toConversationAs(who: "chloe" | "diego" | "elena" | "farid", title: string) {
+  const s = await openSession(title);
+  const ctx = await ctxAs(who);
+  let { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+  interview = (await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" })).interview;
+  for (const item of ["ability", "pace", "relevance", "recommend"]) {
+    interview = (await saveRating(ctx, { interview_id: interview.id, item_id: item, choice: "prefer_not_to_say" })).interview;
+  }
+  return { s, ctx, interview };
+}
+
+describe("the model's reasoning", () => {
+  it("is minimal unless AI_REASONING names another level", () => {
+    const before = process.env.AI_REASONING;
+    try {
+      delete process.env.AI_REASONING;
+      expect(reasoningLevel()).toBe("minimal");
+      process.env.AI_REASONING = "medium";
+      expect(reasoningLevel()).toBe("medium");
+      process.env.AI_REASONING = "lots";
+      expect(reasoningLevel()).toBe("minimal");
+    } finally {
+      if (before === undefined) delete process.env.AI_REASONING;
+      else process.env.AI_REASONING = before;
+    }
+  });
+});
+
+describe("a model turn", () => {
+  it("offers no tools on its last step, so a model that keeps calling tools still ends in a reply", async () => {
+    const seen: string[][] = [];
+    overrideStubBrain("interviewer", (call) => {
+      seen.push([...call.toolNames].sort());
+      return call.toolNames.length
+        ? { toolCalls: [{ name: "flag_blocker", input: { summary: "Again" } }] }
+        : { text: JSON.stringify({ reply: "Thanks. Was anything unclear?", topic_action: "next_topic", learner_declined: false, offered_to_post_question: false }) };
+    });
+    const { ctx, interview } = await toConversationAs("farid", "Tool loop");
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "The guide was useful.", mode: "text" });
+    expect(turn.reply.text).toBe("Thanks. Was anything unclear?");
+    // The conversation offers no save_rating, raise_question only after an offer, and the final step nothing.
+    expect(seen).toEqual([["end_interview", "flag_blocker"], ["end_interview", "flag_blocker"], []]);
+  });
+
+  it("doesn't end the interview when the turn that called end_interview failed", async () => {
+    overrideStubBrain("interviewer", (call) => (call.toolResults.length ? { text: "not the reply format" } : { toolCalls: [{ name: "end_interview", input: {} }] }));
+    const { ctx, interview } = await toConversationAs("chloe", "Failed ending");
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "The Core Agent settings were hard.", mode: "text" });
+    expect(turn.interview.stage).toBe("conversation");
+  });
+
+  it("ends early only when the reply also says the learner asked to stop", async () => {
+    const reply = (stop: boolean) => JSON.stringify({ reply: "Okay.", topic_action: "stay", learner_declined: false, offered_to_post_question: false, learner_asked_to_stop: stop });
+    overrideStubBrain("interviewer", (call) => (call.toolResults.length ? { text: reply(call.lastUser.includes("stop")) } : { toolCalls: [{ name: "end_interview", input: {} }] }));
+    const { ctx, interview } = await toConversationAs("elena", "Ending early");
+    let turn = await sendTurn(ctx, { interview_id: interview.id, text: "The guide was the most useful part.", mode: "text" });
+    expect(turn.interview.stage).toBe("conversation");
+    turn = await sendTurn(ctx, { interview_id: interview.id, text: "Can we stop here, please?", mode: "text" });
+    expect(turn.interview.stage).toBe("read_back");
+  });
+
+  it("drops the follow-up when the turns left are needed for the topics still to ask", async () => {
+    // A model that follows up whenever it may. With 6 turns and four topics (no brief, no changes), only code can fit them all in.
+    overrideStubBrain("interviewer", (call) => {
+      if (call.context.stage === "read_back") return { text: JSON.stringify({ points: ["One", "Two", "Three"] }) };
+      const current = call.context.current_topic as { follow_up_available: boolean } | null;
+      return { text: JSON.stringify({ reply: "Tell me more?", topic_action: current?.follow_up_available ? "follow_up" : "next_topic", learner_declined: false, offered_to_post_question: false }) };
+    });
+    const setup: EngineSetup = { kind: "session", guide: DEFAULT_SESSION_GUIDE, brief: null, actions: [], courseTitle: "Course", sessionTitle: "Session", learnerName: null, limits: { maxTurns: 6, maxMinutes: 15 } };
+    const deps = { model: languageModel("interviewer"), instructions: "" };
+    let state: EngineState = { stage: "consent", progress: initialProgress(setup), turnCount: 0, startedAt: new Date(), ratings: {}, history: [] };
+    const consent = await handleLearnerTurn(deps, setup, { ...state, turnCount: 1 }, "Ready", "text", new Date());
+    state = { ...state, stage: consent.stage, progress: consent.progress, turnCount: 1 };
+    for (const item of DEFAULT_SESSION_GUIDE.rating_items) {
+      const r = handleChip(setup, state, item.id, "prefer_not_to_say");
+      state = { ...state, stage: r.stage, progress: r.progress, ratings: { ...state.ratings, [item.id]: "prefer_not_to_say" } };
+    }
+    while (state.stage === "conversation" && state.turnCount < 12) {
+      const turnCount = state.turnCount + 1;
+      const r = await handleLearnerTurn(deps, setup, { ...state, turnCount }, `Answer ${turnCount}`, "text", new Date());
+      state = { ...state, stage: r.stage, progress: r.progress, turnCount };
+    }
+    expect(state.stage).toBe("read_back");
+    expect(state.turnCount).toBeLessThanOrEqual(6);
+    expect(state.progress.topics.filter((t) => t.status === "pending")).toEqual([]);
+  });
+
+  it("says thanks once when a typed rating leads into the conversation", async () => {
+    const s = await openSession("One thanks");
+    const ctx = await ctxAs("chloe");
+    let { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+    interview = (await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" })).interview;
+    let last = "";
+    for (const answer of ["Yes, without help", "About right", "Most of it", "8"]) last = (await sendTurn(ctx, { interview_id: interview.id, text: answer, mode: "text" })).reply.text;
+    expect(last).toMatch(/^Thanks\. Now a few questions/);
+    expect(last).not.toMatch(/Thanks\. Thanks/);
+  });
+
+  it("asks which choice is closest when an unclear rating gets a reply with no question", async () => {
+    overrideStubBrain("interviewer", () => ({ text: JSON.stringify({ reply: "Thanks, that's clear.", topic_action: "stay", learner_declined: false, offered_to_post_question: false }) }));
+    const s = await openSession("Unclear rating");
+    const ctx = await ctxAs("diego");
+    const { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+    await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" });
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "Honestly, it depends on the day.", mode: "text" });
+    expect(turn.interview.stage).toBe("ratings");
+    expect(turn.reply.text).toMatch(/^Thanks\. Which of these is closest: .+\?$/);
+  });
+
+  it("can't overwrite a chip rating during the conversation", async () => {
+    overrideStubBrain("interviewer", (call) =>
+      call.toolResults.length
+        ? { text: JSON.stringify({ reply: "Thanks. Was anything unclear?", topic_action: "next_topic", learner_declined: false, offered_to_post_question: false }) }
+        : { toolCalls: [{ name: "save_rating", input: { item_id: "pace", choice: "too_fast" } }] },
+    );
+    const { ctx, interview } = await toConversationAs("diego", "Ratings held");
+    await sendTurn(ctx, { interview_id: interview.id, text: "It all felt a bit rushed.", mode: "text" });
+    const rows = await sql()`select choice from public.ratings where interview_id = ${interview.id} and item_id = 'pace'`;
+    expect(rows).toEqual([{ choice: "prefer_not_to_say" }]);
   });
 });

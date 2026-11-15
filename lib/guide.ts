@@ -73,7 +73,7 @@ export const DEFAULT_SESSION_GUIDE: GuidePart = {
     { id: "blockers", label: "Blockers", goal: "What blocked or slowed the learner down, during the session or since.", opener: "Did anything block or slow you down, during the session or since?" },
     { id: "change_next_time", label: "Change next time", goal: "What the instructor should change for the next session.", opener: "If you could change one thing for the next session, what would it be?" },
     { id: "brief_question", label: "From the session brief", goal: "One question drawn from the session brief's topics or known issues.", opener: "How did you get on with {topic}?" },
-    { id: "last_changes", label: "Last session's changes", goal: "Whether the changes made after the last session helped.", opener: "After the last session we made some changes. Did they make a difference for you?" },
+    { id: "last_changes", label: "Last session's changes", goal: "How the part of the session changed after the last session's feedback worked for the learner, asked without describing the change.", opener: "How did the balance of this session work for you?" },
   ],
 };
 

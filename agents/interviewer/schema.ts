@@ -6,6 +6,10 @@ export const turnOutputSchema = z.object({
   topic_action: z.enum(["follow_up", "next_topic", "stay"]),
   learner_declined: z.boolean(),
   offered_to_post_question: z.boolean(),
+  /** True only when the learner said they want to stop now. end_interview counts only with it. */
+  learner_asked_to_stop: z.boolean().default(false),
+  /** True only when the learner is blocked now (see the Blockers section). flag_blocker counts only with it. */
+  learner_is_blocked: z.boolean().default(false),
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
 

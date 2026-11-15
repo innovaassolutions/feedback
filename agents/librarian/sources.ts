@@ -3,7 +3,7 @@ import { parse, type HTMLElement } from "node-html-parser";
 import robotsParser from "robots-parser";
 import type { JobDeps } from "@/lib/server/jobs/queue";
 import { enqueue } from "@/lib/server/jobs/queue";
-import { chunkText } from "@/lib/server/librarian/chunk";
+import { chunkText, storableText } from "@/lib/server/librarian/chunk";
 import { errorName } from "@/lib/server/ai/runs";
 import { embedTexts } from "./reading";
 import { toVector } from "./tools";
@@ -58,7 +58,7 @@ export function inScope(candidate: URL, root: URL): boolean {
 export function pageText(html: string): { title: string; text: string; links: string[] } {
   const root = parse(html, { blockTextElements: { script: false, style: false, noscript: false, pre: true } });
   const links = root.querySelectorAll("a[href]").map((a) => a.getAttribute("href") ?? "").filter(Boolean);
-  const title = (root.querySelector("h1")?.text ?? root.querySelector("title")?.text ?? "").trim();
+  const title = storableText(root.querySelector("h1")?.text ?? root.querySelector("title")?.text ?? "").trim();
   for (const sel of ["nav", "header", "footer", "aside", "script", "style", "noscript", "svg"]) root.querySelectorAll(sel).forEach((n) => n.remove());
   const main: HTMLElement = root.querySelector("main") ?? root.querySelector("article") ?? root.querySelector("body") ?? root;
   const blocks = main

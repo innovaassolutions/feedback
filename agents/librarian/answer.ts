@@ -10,6 +10,9 @@ import type { AdminClient } from "@/lib/server/supabase-admin";
 import { answerSchema } from "./schema";
 import { librarianTools, searchSources, type SourceHit } from "./tools";
 
+/** Search steps plus the final answer. */
+const ANSWER_STEPS = 5;
+
 export type Citation = {
   chunk_id: string;
   kind: SourceHit["kind"];
@@ -117,8 +120,11 @@ export async function answerQuestion(payload: { question_id: string }, deps: Job
       instructions: agent.instructions,
       prompt: `Task: answer_question\n\n<context>${JSON.stringify({ task: "answer_question", question: q.text })}</context>\n\nThe learner's question: ${q.text}`,
       tools: librarianTools(db, q.course_id, seen, searchMeta),
+      // The last step offers no tools, so the model answers from what it found instead of searching
+      // until the steps run out (a real model searched six times and never answered).
+      prepareStep: ({ stepNumber }) => (stepNumber >= ANSWER_STEPS - 1 ? { activeTools: [] } : {}),
       output: Output.object({ schema: answerSchema }),
-      stopWhen: isStepCount(5),
+      stopWhen: isStepCount(ANSWER_STEPS),
       maxOutputTokens: 1200,
     });
     output = answerSchema.parse(result.output);

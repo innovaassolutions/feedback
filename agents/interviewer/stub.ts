@@ -39,14 +39,14 @@ const QUESTIONS: Record<string, string> = {
   blockers: "Did anything block or slow you down, during the session or since?",
   change_next_time: "What would you change about the next session?",
   brief_question: "How did you get on with that part of the session?",
-  last_changes: "Did the changes since the last session make a difference for you?",
+  last_changes: "How did the balance of this session work for you?",
   used_at_work: "What have you used at work since the course?",
   what_stopped: "What, if anything, stopped you using it?",
   support_needed: "What support would help you use it more?",
 };
 
-function out(reply: string, topic_action: "follow_up" | "next_topic" | "stay", extra: Partial<{ learner_declined: boolean; offered_to_post_question: boolean }> = {}): StubReply {
-  return { text: JSON.stringify({ reply, topic_action, learner_declined: false, offered_to_post_question: false, ...extra }) };
+function out(reply: string, topic_action: "follow_up" | "next_topic" | "stay", extra: Partial<{ learner_declined: boolean; offered_to_post_question: boolean; learner_asked_to_stop: boolean; learner_is_blocked: boolean }> = {}): StubReply {
+  return { text: JSON.stringify({ reply, topic_action, learner_declined: false, offered_to_post_question: false, learner_asked_to_stop: false, learner_is_blocked: blockedTurn, ...extra }) };
 }
 
 function lastLearnerQuestion(call: StubCall): string | null {
@@ -59,11 +59,15 @@ function lastLearnerQuestion(call: StubCall): string | null {
   return null;
 }
 
+/** Set per call: the stub confirms a blocker in its reply when it flagged one. */
+let blockedTurn = false;
+
 export function interviewerStub(call: StubCall): StubReply {
   const ctx = call.context;
   const text = call.lastUser;
   const t = norm(text);
   const already = new Set(call.toolResults.map((r) => r.name));
+  blockedTurn = already.has("flag_blocker");
 
   if (ctx.stage === "read_back") {
     const learnerTurns = call.prompt
@@ -104,6 +108,7 @@ export function interviewerStub(call: StubCall): StubReply {
     }
     if (calls.length) return { toolCalls: calls };
   }
+  if (already.has("end_interview")) return out("Okay, let's stop there.", "stay", { learner_asked_to_stop: true });
 
   const nextQuestion = next ? next.suggested_opener || QUESTIONS[next.id] || "What else would you like to tell the instructor?" : "Thank you, that's everything I wanted to ask.";
 
