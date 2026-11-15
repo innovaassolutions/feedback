@@ -2,7 +2,9 @@
 
 ## Status of the first Live check
 
-**Not yet run.** Phase 5's first criterion asks for a short trial against the real Vocal Bridge service: every spoken turn reaches `send_turn`, every reply is spoken word for word, and whether audio recording can be turned off. This build had no Vocal Bridge account or API key, so the trial hasn't happened. Everything below is how the integration is built and what to check when it is run.
+**Not yet run.** Phase 5's first criterion asks for a short trial against the real Vocal Bridge service: every spoken turn reaches `send_turn`, every reply is spoken word for word, and whether audio recording can be turned off. The trial needs someone speaking into a microphone, so it hasn't happened yet.
+
+What is in place (2026-11-15): Todd's account key is in `.env.local`, the agent below exists, and the app's own token call (`mintVoiceToken`) gets a token for it. Everything below is how the integration is built and what to check when the trial is run.
 
 ## How voice works in the app
 
@@ -15,18 +17,24 @@
 - Spoken turns are stored as text with `mode = 'voice'` and shown with a microphone mark. No audio is written to the database or to Storage.
 - If the token can't be minted or the connection fails, the button turns off and a notice says voice isn't available.
 
-## Vocal Bridge agent settings to use
+## The Vocal Bridge agent
 
-Configure these in the Vocal Bridge dashboard (the plan avoids the pip-installed CLI):
+**Course Feedback Interviewer**, id `932ddd03-f2b1-4cbf-bf7d-09bc5a22b5b6`, set as `VOCAL_BRIDGE_AGENT_ID`. It was created on 2026-11-15 with `POST https://vocalbridgeai.com/api/v1/agents` (the REST call the pip CLI's `vb agent create` makes; the CLI itself isn't installed). An account key has to name the agent, so the `X-Agent-Id` header is required, not optional.
 
-| Setting | Value |
-| --- | --- |
-| Agent mode | AI Agent (responses come from the app through `onAIAgentQuery`) |
-| Speak the response | Word for word, with no rewording or summarising by Vocal Bridge |
-| Opening greeting | None: the Interviewer's messages come from the app |
-| Call recording / audio retention | Off, if the dashboard offers it (to confirm in the trial) |
-| Transcript retention on Vocal Bridge's side | As short as the dashboard allows (to confirm in the trial) |
-| Language | English (the plan's default) |
+| Setting | Value sent | Why |
+| --- | --- | --- |
+| `mode` | `cascaded_concierge` (the dashboard's "Focused" style) | Speech to text, then text to speech of the reply. Vocal Bridge says verbatim delivery is only best effort in "Chatty" |
+| `deploy_targets` | `web` | No phone number is provisioned or billed |
+| `ai_agent_config` | `enabled: true`, `verbatim: true`, no endpoint URL, `response_delivery.mode: single` | With no endpoint URL, Vocal Bridge delegates to the browser, which is `onAIAgentQuery` in the app. One reply per turn, spoken as written |
+| `prompt` | Relay only: send the learner's exact words to the AI agent, speak its reply word for word, add nothing, wait out mid-sentence pauses | The Interviewer in the app writes every reply |
+| `greeting` | None | The Interviewer's opening message comes from the app |
+| `background_enabled`, `web_search_enabled` | `false` | Vocal Bridge must not answer anything itself |
+| `hold`, `transfer`, `hangup`, DTMF, `debug_mode` | `false` | Not needed on the web |
+| Call recording / audio retention | Not exposed by the API at creation. To check in the dashboard during the trial | The plan wants no audio kept |
+| Transcript retention on Vocal Bridge's side | To check in the dashboard during the trial | |
+| Language | Vocal Bridge's default (English) | The plan's default |
+
+The token response names the LiveKit address `livekit_url`. The SDK accepts that or `url`, and the app passes the response through unchanged.
 
 ## The trial to run
 

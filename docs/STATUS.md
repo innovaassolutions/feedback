@@ -1,6 +1,6 @@
 # Status
 
-**All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no model key or Vocal Bridge account, and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
+**All eight phases are built.** 77 of the plan's 85 criteria are verified and ticked. The eight that aren't are the Live criteria: there's no AI Gateway key yet, the voice trials need a person speaking (the Vocal Bridge key and agent are now set up), and the real Session 1 rebuild guide and Streamspace logo aren't in the repository. See [Not yet verified](#not-yet-verified).
 
 Last checked on 14 November 2026: `npm run check` passes (type check, lint, 94 Vitest tests in 13 files) and `npm run e2e` passes (22 Playwright tests) while `npm run dev` is running.
 
@@ -87,8 +87,8 @@ Not done in this build (it needs Todd's accounts). The steps:
 | Phase 2, Live: the drafted brief from the Session 1 rebuild guide names Get Document Data, Core Agent and Link Generator | No model key; the real rebuild guide isn't in the repository | A gateway key, then upload the guide to Session 1 as an instructor and read the draft on the admin session page |
 | Phase 3, Live: a full interview on Session 1 in under eight minutes, mentioning a brief topic, with themes | No model key | A gateway key; run an interview as a seeded learner |
 | Phase 3, Live: `npm run evals` meets both pass marks | No model key | A gateway key; `npm run evals`, then commit the report |
-| Phase 5, Live first: the voice trial | No Vocal Bridge account or key | See `docs/VOICE.md` for the trial and the agent settings |
-| Phase 5, Live: a full voice interview in Chrome on a laptop and in a phone browser | No Vocal Bridge account or key | As above, on both devices (the phone needs the app reachable over HTTPS) |
+| Phase 5, Live first: the voice trial | Needs a person speaking. The key, the agent and token minting are in place and checked | Run the trial in `docs/VOICE.md` on `localhost:3000` |
+| Phase 5, Live: a full voice interview in Chrome on a laptop and in a phone browser | Needs a person speaking; the phone also needs HTTPS | As above, on both devices (the phone needs the app reachable over HTTPS) |
 | Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | No model key; no real rebuild guide | A gateway key and the guide on Session 1 |
 | Phase 6, Live: an answer citing `docs.streamspace.ai` | No model key | A gateway key; add the site as Dana under Admin → Product documentation, then ask on Session 1 |
 | Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | No model key; the seeded logo is a placeholder | A gateway key and the real logo, uploaded on `/streamspace/settings/brand` |
@@ -107,7 +107,7 @@ Verified with a stand-in rather than the real service: Phase 5's browser criteri
 
 **What was built.** Everything in the plan's eight phases: the multi-tenant app on Next.js and Supabase with Row Level Security on every table, four agents behind the Vercel AI SDK with versioned instructions, schemas, stubs and evals, the dashboard, Q&A, voice, branding, quality monitoring, reminders, the follow-up interview and retention.
 
-**Still unverified.** The eight Live criteria in the table above. Each needs a model key, a Vocal Bridge account or the client's real files.
+**Still unverified.** The eight Live criteria in the table above. Each needs an AI Gateway key, a person to run the voice trial, or the client's real files.
 
 **Decisions.** About 70 choices the plan didn't make are in `docs/DECISIONS.md`. The ones Todd is most likely to want to revisit:
 - one instructor per seeded organization doubles as its admin;

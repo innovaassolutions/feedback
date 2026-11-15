@@ -1,7 +1,8 @@
 // Mints short-lived Vocal Bridge tokens. The API key is read only here and never reaches the
 // browser. The participant name is decided on the server: "Learner" unless the interview is named.
 
-export type VoiceToken = { url: string; token: string; room_name: string; participant_identity: string; expires_in: number; agent_mode?: string };
+// Vocal Bridge returns the LiveKit address as livekit_url; the SDK also accepts url.
+export type VoiceToken = { url?: string; livekit_url?: string; token: string; room_name: string; participant_identity: string; expires_in: number; agent_mode?: string };
 
 export class VoiceUnavailable extends Error {
   constructor(message: string) {
