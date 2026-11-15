@@ -5,8 +5,9 @@ import { cx } from "@/components/ui";
 /** The parts of the Vocal Bridge client this button uses. */
 export type VoiceClient = {
   on(event: "transcript", handler: (e: { role: "user" | "agent"; text: string }) => void): unknown;
+  on(event: "aiAgentQuery", handler: (e: { query: string; turnId: string }) => void): unknown;
   on(event: "error", handler: (e: unknown) => void): unknown;
-  onAIAgentQuery(handler: (query: string) => Promise<string>): unknown;
+  sendAIAgentResponse(turnId: string, response: string): Promise<void>;
   sendAction(action: string, payload?: Record<string, unknown>): Promise<void>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
@@ -23,13 +24,22 @@ declare global {
 
 const NOTICE_MIC = "We couldn't use your microphone, so voice is off. You can keep typing.";
 const NOTICE_SERVICE = "Voice isn't available right now. You can keep typing.";
+const NOT_HEARD = "Sorry, I didn't catch that. Could you say it again?";
+
+/**
+ * Spoken the moment a turn reaches the app, while the Interviewer writes its reply (about three
+ * seconds). They are neutral: most replies open with "Thanks", and the Interviewer mustn't sound
+ * as if it agrees. They are only spoken, never added to the transcript.
+ */
+export const ACKNOWLEDGEMENTS = ["Got it.", "Okay."];
 
 /**
  * The microphone button. Vocal Bridge runs in its AI Agent mode: it transcribes what the learner
  * says, we pass it to send_turn like a typed turn, and Vocal Bridge speaks the Interviewer's reply.
- * Any other question on screen (the one waiting when voice starts, or the next one after a chip
- * tap) is sent with the agent's read_aloud action, so the learner is never left in silence.
- * Audio is never stored by the app.
+ * Each turn gets two responses: a short acknowledgement straight away, then the reply (the agent
+ * accepts two per turn). Any other question on screen (the one waiting when voice starts, or the
+ * next one after a chip tap) is sent with the agent's read_aloud action, so the learner is never
+ * left in silence. Audio is never stored by the app.
  */
 export function VoiceButton({
   interviewId,
@@ -55,6 +65,27 @@ export function VoiceButton({
   const spoken = useRef<string | null>(null);
   // While a spoken turn is in flight, its reply goes back as the turn's answer and must not be read twice.
   const inFlight = useRef(false);
+  const acknowledged = useRef(0);
+
+  async function answer(c: VoiceClient, query: string, turnId: string) {
+    onPartial("");
+    inFlight.current = true;
+    const ack = ACKNOWLEDGEMENTS[acknowledged.current++ % ACKNOWLEDGEMENTS.length];
+    void c.sendAIAgentResponse(turnId, ack).catch(() => {});
+    try {
+      const reply = (await utter.current(query)) ?? NOT_HEARD;
+      spoken.current = reply;
+      await c.sendAIAgentResponse(turnId, reply);
+    } catch {
+      // A turn that ends after the learner stopped voice needs no notice.
+      if (client.current === c) {
+        onNotice(NOTICE_SERVICE);
+        void stop();
+      }
+    } finally {
+      inFlight.current = false;
+    }
+  }
 
   function readAloud(c: VoiceClient, text: string | null) {
     if (!text || text === spoken.current || inFlight.current) return;
@@ -105,17 +136,8 @@ export function VoiceButton({
         onNotice(NOTICE_SERVICE);
         void stop();
       });
-      c.onAIAgentQuery(async (query) => {
-        onPartial("");
-        inFlight.current = true;
-        try {
-          const reply = (await utter.current(query)) ?? "Sorry, I didn't catch that. Could you say it again?";
-          spoken.current = reply;
-          return reply;
-        } finally {
-          inFlight.current = false;
-        }
-      });
+      // The event, not onAIAgentQuery: that handler can send only one response per turn.
+      c.on("aiAgentQuery", ({ query, turnId }) => void answer(c, query, turnId));
       client.current = c;
       spoken.current = null;
       await c.connect();
