@@ -31,9 +31,13 @@ const NOTICE_SERVICE = "Voice isn't available right now. You can keep typing.";
  * tap) is sent with the agent's read_aloud action, so the learner is never left in silence.
  * Audio is never stored by the app.
  */
+export type VoiceState = "off" | "starting" | "on";
+
 export function VoiceButton({
   interviewId,
   currentPrompt,
+  autoStart = false,
+  onStateChange,
   onPartial,
   onUtterance,
   onNotice,
@@ -41,16 +45,29 @@ export function VoiceButton({
   interviewId: string;
   /** The Interviewer's latest message, to read aloud if it wasn't already spoken as a reply. */
   currentPrompt: string | null;
+  /** Turns voice on as soon as the button appears: the learner chose voice on the entrance screen. */
+  autoStart?: boolean;
+  onStateChange?: (state: VoiceState) => void;
   onPartial: (text: string) => void;
   onUtterance: (text: string) => Promise<string | null>;
   onNotice: (message: string) => void;
 }) {
-  const [state, setState] = useState<"off" | "starting" | "on">("off");
+  const [state, setLocalState] = useState<VoiceState>("off");
   const client = useRef<VoiceClient | null>(null);
   const utter = useRef(onUtterance);
   useEffect(() => {
     utter.current = onUtterance;
   }, [onUtterance]);
+  const stateChanged = useRef(onStateChange);
+  useEffect(() => {
+    stateChanged.current = onStateChange;
+  }, [onStateChange]);
+  // Every change is reported as it happens. Reporting after a render missed one: a refused microphone
+  // went from starting to off before React rendered, and the screen waited on "Starting the voice…".
+  function setState(next: VoiceState) {
+    setLocalState(next);
+    stateChanged.current?.(next);
+  }
   // The last text Vocal Bridge spoke or was asked to speak, so nothing is read twice.
   const spoken = useRef<string | null>(null);
   // While a spoken turn is in flight, its reply goes back as the turn's answer and must not be read twice.
@@ -80,6 +97,16 @@ export function VoiceButton({
       void client.current?.disconnect().catch(() => {});
     };
   }, []);
+
+  // Once only, even when React runs effects twice in development.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void start();
+    // start() is stable enough here: it runs once, on the first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   async function start() {
     setState("starting");

@@ -10,6 +10,7 @@ What is in place (2026-11-15): Todd's account key is in `.env.local`, the agent 
 
 ## How voice works in the app
 
+- The entrance screen asks "How would you like to answer?" next to the anonymity choice: **Start with voice** or **Start with chat**. Voice turns the microphone on straight away and reads the welcome aloud, including the anonymity level. The welcome ends "Tell me when you are ready to start", so the learner says they're ready, and the first question is spoken as the reply. While voice is on, the welcome step shows no Start button, so it can't be skipped by mistake. If the microphone or the service fails, the Start button comes back and the interview carries on as a chat. Before this, the welcome step had a Start button above the microphone. Pressing Start first moved straight to the first question, and the learner never heard the welcome.
 - The chat window has a microphone button (`components/interview/voice.tsx`). Voice and typing share one interview, one transcript and one Interviewer.
 - Pressing it first asks the browser for the microphone. If that's refused, a notice appears and typing carries on.
 - The browser then uses `@vocalbridgeai/sdk` (the client underneath `@vocalbridgeai/react`) with `auth.tokenUrl` set to `/api/interviews/{id}/voice-token`.

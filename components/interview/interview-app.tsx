@@ -4,7 +4,7 @@ import { api } from "@/lib/client/api";
 import { ANONYMITY_LABEL } from "@/lib/labels";
 import { Button, Card, Notice, cx, inputClass } from "@/components/ui";
 import type { ChatMessage, PublicInterview } from "@/lib/server/ops/interviews";
-import { VoiceButton } from "@/components/interview/voice";
+import { VoiceButton, type VoiceState } from "@/components/interview/voice";
 
 type Anonymity = "named" | "anonymous" | "private";
 
@@ -74,6 +74,9 @@ export function InterviewApp(props: {
   const [rated, setRated] = useState(false);
   const [points, setPoints] = useState<string[]>(props.initial?.interview.summary ?? []);
   const [livePartial, setLivePartial] = useState<string>("");
+  // How the learner chose to answer on the entrance screen. Voice starts with the welcome read aloud.
+  const [answerBy, setAnswerBy] = useState<"voice" | "chat">("chat");
+  const [voiceState, setVoiceState] = useState<VoiceState>("off");
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,12 +89,17 @@ export function InterviewApp(props: {
     setInterview(next);
   }
 
-  async function start() {
+  async function start(by: "voice" | "chat") {
     setBusy(true);
     setError(null);
+    setAnswerBy(by);
+    if (by === "voice") setVoiceState("starting");
     const res = await api<{ interview: PublicInterview; messages: ChatMessage[] }>("POST", `/api/sessions/${props.sessionId}/interviews`, { anonymity, kind: props.kind });
     setBusy(false);
-    if (!res.ok) return setError(res.error);
+    if (!res.ok) {
+      setVoiceState("off");
+      return setError(res.error);
+    }
     applyInterview(res.data.interview);
     setMessages(res.data.messages);
   }
@@ -174,7 +182,24 @@ export function InterviewApp(props: {
         </div>
         <AnonymityChoice value={anonymity} onChange={setAnonymity} name="anonymity-start" />
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button onClick={start} disabled={busy}>{busy ? "Starting…" : "Start the interview"}</Button>
+        {props.voiceEnabled ? (
+          <div className="space-y-2" role="group" aria-labelledby="answer-by">
+            <p id="answer-by" className="font-medium">How would you like to answer?</p>
+            <p className="text-sm text-muted">With voice, the interviewer reads each question aloud and listens to your answer. You can switch to typing at any point.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => start("voice")} disabled={busy}>
+                <span aria-hidden className="mr-1">🎙</span>
+                {busy && answerBy === "voice" ? "Starting…" : "Start with voice"}
+              </Button>
+              <Button variant="secondary" onClick={() => start("chat")} disabled={busy}>
+                <span aria-hidden className="mr-1">💬</span>
+                {busy && answerBy === "chat" ? "Starting…" : "Start with chat"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button onClick={() => start("chat")} disabled={busy}>{busy ? "Starting…" : "Start the interview"}</Button>
+        )}
       </Card>
     );
   }
@@ -214,8 +239,14 @@ export function InterviewApp(props: {
           <div ref={bottom} />
         </div>
         {interview.stage === "consent" ? (
-          <div className="border-t border-border p-4">
-            <Button onClick={() => send("Ready", "text")} disabled={busy}>Start</Button>
+          <div className="border-t border-border p-4" data-testid="welcome-step">
+            {voiceState === "on" ? (
+              <p>Listen to the welcome, then say that you are ready.</p>
+            ) : voiceState === "starting" ? (
+              <p className="text-muted">Starting the voice…</p>
+            ) : (
+              <Button onClick={() => send("Ready", "text")} disabled={busy}>Start</Button>
+            )}
           </div>
         ) : null}
         {pending ? (
@@ -262,6 +293,8 @@ export function InterviewApp(props: {
             <VoiceButton
               interviewId={interview.id}
               currentPrompt={[...messages].reverse().find((m) => m.role === "interviewer")?.text ?? null}
+              autoStart={answerBy === "voice"}
+              onStateChange={setVoiceState}
               onPartial={setLivePartial}
               onUtterance={async (spoken) => {
                 setLivePartial("");

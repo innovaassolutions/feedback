@@ -27,7 +27,7 @@ test("chips, a stage marker, and a summary screen to edit points and change anon
 
   await expect(page.getByTestId("consent")).toContainText("the way you write can still identify you");
   await expect(page.getByLabel("Anonymous")).toBeChecked();
-  await page.getByRole("button", { name: "Start the interview" }).click();
+  await page.getByRole("button", { name: "Start with chat" }).click();
 
   const marker = page.getByTestId("stage-marker");
   await expect(marker.locator("[aria-current=step]")).toHaveText("Consent");

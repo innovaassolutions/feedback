@@ -55,10 +55,34 @@ async function installFakeVoice(page: Page, opts: { refuseMicrophone?: boolean }
 
 async function startInterview(page: Page, learner: string, n: number) {
   await signIn(page, learner, `/streamspace/ime-engineering/sessions/${n}/interview`);
-  await page.getByRole("button", { name: "Start the interview" }).click();
+  await page.getByRole("button", { name: "Start with chat" }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByTestId("rating-chip").first()).toBeVisible();
 }
+
+test("choosing voice on the entrance screen reads the welcome aloud, and saying ready starts the questions", async ({ page }) => {
+  const n = await openSession("Voice from the start");
+  await installFakeVoice(page);
+  await signIn(page, "hamish", `/streamspace/ime-engineering/sessions/${n}/interview`);
+  await expect(page.getByTestId("consent")).toContainText("How would you like to answer?");
+  await page.getByRole("button", { name: "Start with voice" }).click();
+
+  // Voice comes on by itself, and the first thing read aloud is the welcome with the anonymity level.
+  await expect(page.getByTestId("mic-button")).toHaveAttribute("data-state", "on");
+  const readAloud = () => page.evaluate(() => (window as unknown as { __fakeVoice: { readAloud: string[] } }).__fakeVoice.readAloud);
+  await expect.poll(readAloud).toHaveLength(1);
+  expect((await readAloud())[0]).toContain("Thanks for giving feedback");
+  expect((await readAloud())[0]).toContain("You chose Anonymous");
+  // No Start button to press by mistake: the learner says they're ready.
+  await expect(page.getByTestId("welcome-step")).toHaveText("Listen to the welcome, then say that you are ready.");
+  await expect(page.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
+
+  const reply = await page.evaluate(() => (window as unknown as { __fakeVoice: { say: (t: string) => Promise<string> } }).__fakeVoice.say("I'm ready"));
+  expect(reply).toContain("Could you now do what this session taught");
+  await expect(page.getByTestId("stage-marker").locator("[aria-current=step]")).toHaveText("Ratings");
+  // The first question was spoken as the reply, so it isn't read aloud again.
+  expect(await readAloud()).toHaveLength(1);
+});
 
 test("the microphone asks for permission, spoken turns appear marked with a microphone, and typing carries on the same interview", async ({ page }) => {
   const n = await openSession("Voice in the browser");
@@ -99,9 +123,11 @@ test("the microphone asks for permission, spoken turns appear marked with a micr
 test("with the microphone refused the chat still works and shows a notice", async ({ page }) => {
   const n = await openSession("Microphone refused");
   await installFakeVoice(page, { refuseMicrophone: true });
-  await startInterview(page, "farid", n);
-  await page.getByTestId("mic-button").click();
+  await signIn(page, "farid", `/streamspace/ime-engineering/sessions/${n}/interview`);
+  await page.getByRole("button", { name: "Start with voice" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "couldn't use your microphone" })).toBeVisible();
+  // Voice chosen but refused: the interview carries on as a chat.
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.getByTestId("rating-chip").filter({ hasText: "Not yet" }).click();
   await expect(page.getByTestId("learner-bubble").filter({ hasText: "Not yet" })).toBeVisible();
 });
