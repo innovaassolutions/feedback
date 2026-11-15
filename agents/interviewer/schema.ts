@@ -10,6 +10,11 @@ export const turnOutputSchema = z.object({
   learner_asked_to_stop: z.boolean().default(false),
   /** True only when the learner is blocked now (see the Blockers section). flag_blocker counts only with it. */
   learner_is_blocked: z.boolean().default(false),
+  /**
+   * True when, instead of answering, the learner said they don't understand the question, asked to
+   * hear it again, or said the questions are confusing. No rating is saved on such a turn.
+   */
+  learner_asked_to_explain: z.boolean().default(false),
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
 
@@ -33,6 +38,8 @@ export type Progress = {
   rating_items: string[];
   current_item: string | null;
   clarified: string[];
+  /** Rating items explained again because the learner didn't understand them. Once each. */
+  explained?: string[];
   topics: TopicState[];
   current_topic: string | null;
   last_offer: boolean;

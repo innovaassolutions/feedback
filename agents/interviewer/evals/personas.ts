@@ -27,9 +27,10 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "confused_beginner",
-    description: "New to the platform and to workflow tools. Unsure of terms, often says 'I think' or 'I'm not sure', sometimes asks what a word means. Honest that they would need help.",
+    description: "New to the platform and to workflow tools. Unsure of terms, often says 'I think' or 'I'm not sure', sometimes asks what a word means. On one of the rating questions, says they don't understand the question and asks what it means before answering. Honest that they would need help.",
     lines: [
       "Yes let's start",
+      "Sorry, I don't understand the question",
       "Only with someone helping, I think",
       "Too fast",
       "A little",

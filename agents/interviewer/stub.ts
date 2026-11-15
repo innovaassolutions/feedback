@@ -45,9 +45,12 @@ const QUESTIONS: Record<string, string> = {
   support_needed: "What support would help you use it more?",
 };
 
-function out(reply: string, topic_action: "follow_up" | "next_topic" | "stay", extra: Partial<{ learner_declined: boolean; offered_to_post_question: boolean; learner_asked_to_stop: boolean; learner_is_blocked: boolean }> = {}): StubReply {
-  return { text: JSON.stringify({ reply, topic_action, learner_declined: false, offered_to_post_question: false, learner_asked_to_stop: false, learner_is_blocked: blockedTurn, ...extra }) };
+function out(reply: string, topic_action: "follow_up" | "next_topic" | "stay", extra: Partial<{ learner_declined: boolean; offered_to_post_question: boolean; learner_asked_to_stop: boolean; learner_is_blocked: boolean; learner_asked_to_explain: boolean }> = {}): StubReply {
+  return { text: JSON.stringify({ reply, topic_action, learner_declined: false, offered_to_post_question: false, learner_asked_to_stop: false, learner_is_blocked: blockedTurn, learner_asked_to_explain: false, ...extra }) };
 }
+
+/** "I don't understand the question", "can you repeat that?", "these questions are confusing". */
+export const ASKS_TO_EXPLAIN = /\b(don t|do not|didn t) (understand|get) (the|that|this|your) question\b|\brepeat (the|that|your) (last )?question\b|\bquestions are (very )?confusing\b|\bwhat do you mean\b/;
 
 function lastLearnerQuestion(call: StubCall): string | null {
   const users = call.prompt.filter((m) => m.role === "user");
@@ -86,7 +89,11 @@ export function interviewerStub(call: StubCall): StubReply {
   }
 
   if (ctx.stage === "ratings") {
-    const item = ctx.item as { id: string; choices: Choice[] };
+    const item = ctx.item as { id: string; prompt: string; choices: Choice[] };
+    if (ASKS_TO_EXPLAIN.test(t)) {
+      const labels = item.choices.map((c) => c.label).join(", ");
+      return out(`Sorry, that wasn't clear. I'm asking: ${item.prompt} Which is closest: ${labels}?`, "stay", { learner_asked_to_explain: true });
+    }
     if (!already.has("save_rating")) {
       const choice = matchChoice(text, item.choices);
       if (choice) return { toolCalls: [{ name: "save_rating", input: { item_id: item.id, choice } }] };

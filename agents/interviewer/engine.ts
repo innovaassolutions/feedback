@@ -213,7 +213,19 @@ async function readBackCall(deps: ModelDeps, setup: EngineSetup, history: Turn[]
   }
 }
 
+/**
+ * The summary when the learner said nothing in the conversation. Asked to summarise nothing, a model
+ * wrote points about the interview itself ("You asked to stop the interview…").
+ */
+export const NOTHING_TO_SUMMARISE = "No comments beyond the ratings.";
+const NOTHING_SAID = "You didn't add anything beyond the ratings, so the summary on your screen just says that. Add anything you'd like there, then submit.";
+
+function saidInConversation(history: Turn[]): boolean {
+  return history.some((t) => t.role === "learner" && t.stage === "conversation");
+}
+
 export async function readBack(deps: ModelDeps, setup: EngineSetup, history: Turn[], runs: RunRecord[]): Promise<string[]> {
+  if (!saidInConversation(history)) return [NOTHING_TO_SUMMARISE];
   const out = await readBackCall(deps, setup, history, null, null, runs);
   // A plain fallback the learner can edit, so the interview can still be submitted.
   return out?.points ?? ["Thanks for your feedback. Add or edit points here before you submit."];
@@ -289,14 +301,17 @@ export async function handleLearnerTurn(
     else refused.push(e);
   };
 
-  const toReadBack = async (lead: string): Promise<EngineResult> => {
+  // `stopping`: this turn asked to stop, which isn't feedback to summarise.
+  const toReadBack = async (lead: string, stopping = false): Promise<EngineResult> => {
     const history = [...state.history, { role: "learner" as const, text: learnerText, stage: state.stage }];
-    const points = await readBack(deps, setup, history, runs);
+    const said = saidInConversation(stopping ? state.history : history);
+    const points = said ? await readBack(deps, setup, history, runs) : [NOTHING_TO_SUMMARISE];
     progress.proposed_summary = points;
     progress.current_topic = null;
     progress.current_item = null;
     progress.read_back_turn ??= state.turnCount;
-    return { reply: `${lead}${lead ? " " : ""}${readBackReply(points)}`, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
+    const reply = `${lead}${lead ? " " : ""}${said ? readBackReply(points) : NOTHING_SAID}`;
+    return { reply, stage: "read_back", progress, ratingsToSave, effects, refused, runs };
   };
 
   // Consent: the learner chose their level on the consent screen; their first turn starts the interview.
@@ -339,10 +354,13 @@ export async function handleLearnerTurn(
     }, runs);
     let saved = false;
     let ending = false;
+    // A learner who didn't understand the question hasn't answered it: a real model saved
+    // "prefer not to say" from "your questions are very confusing".
+    const explaining = output?.learner_asked_to_explain === true;
     for (const e of asked) {
       if (e.type === "save_rating") {
         const target = ratingItem(setup, e.item_id);
-        if (target && isValidChoice(target, e.choice)) {
+        if (target && isValidChoice(target, e.choice) && !explaining) {
           ratings[e.item_id] = e.choice;
           ratingsToSave.push({ item_id: e.item_id, choice: e.choice });
           if (e.item_id === item.id) saved = true;
@@ -354,8 +372,16 @@ export async function handleLearnerTurn(
         ending ||= effects.includes(e);
       } else refused.push(e);
     }
-    if (ending) return toReadBack("");
+    if (ending) return toReadBack("Okay, let's stop there.", true);
     if (!saved) {
+      // "I don't understand the question" gets an explanation, once per item, without using up the
+      // item's clarification. It used to count as a second unclear answer and skip the item.
+      const explained = progress.explained ?? [];
+      if (explaining && !explained.includes(item.id)) {
+        progress.explained = [...explained, item.id];
+        const reply = output.reply.includes("?") ? output.reply : `Sorry, I'll ask it another way. ${ratingPrompt(item, spoken)}`;
+        return { reply, stage: "ratings", progress, ratingsToSave, effects, refused, runs };
+      }
       if (!progress.clarified.includes(item.id)) {
         progress.clarified.push(item.id);
         const choices = choicesFor(item).map((c) => c.label).join(", ");
@@ -411,7 +437,7 @@ export async function handleLearnerTurn(
       refused.push(e);
     }
   }
-  if (ending) return toReadBack("Okay, let's stop there.");
+  if (ending) return toReadBack("Okay, let's stop there.", true);
 
   if (!output) {
     // The model's output failed validation: keep the interview moving with the next opener.

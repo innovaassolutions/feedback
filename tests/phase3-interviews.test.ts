@@ -3,7 +3,7 @@ import { sendTurn, saveRating, startInterview, submitInterview } from "@/lib/ser
 import { INTERVIEWER_TOOL_NAMES } from "@/agents/interviewer/tools";
 import { interviewerModel, languageModel, overrideStubBrain, reasoningLevel } from "@/lib/server/ai/models";
 import { voiceModelId } from "@/lib/server/ai/provider";
-import { handleChip, handleLearnerTurn, initialProgress, UPDATED_ON_SCREEN, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
+import { handleChip, handleLearnerTurn, initialProgress, NOTHING_TO_SUMMARISE, UPDATED_ON_SCREEN, type EngineSetup, type EngineState } from "@/agents/interviewer/engine";
 import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 import { seeded, sql, userId } from "./support/db";
 import { ctxAs, statusOf } from "./support/ctx";
@@ -521,5 +521,46 @@ describe("a model turn", () => {
     await sendTurn(ctx, { interview_id: interview.id, text: "It all felt a bit rushed.", mode: "text" });
     const rows = await sql()`select choice from public.ratings where interview_id = ${interview.id} and item_id = 'pace'`;
     expect(rows).toEqual([{ choice: "prefer_not_to_say" }]);
+  });
+
+  it("explains a rating question the learner didn't understand, even after asking which choice is closest", async () => {
+    const s = await openSession("Not understood");
+    const ctx = await ctxAs("farid");
+    const { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+    await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" });
+    await sendTurn(ctx, { interview_id: interview.id, text: "Honestly, it depends on the day.", mode: "voice" });
+    // A voice trial heard "No problem, let's move on" here, with the item saved as Prefer not to say.
+    let turn = await sendTurn(ctx, { interview_id: interview.id, text: "I don't understand the question.", mode: "voice" });
+    expect(turn.interview.stage).toBe("ratings");
+    expect(turn.interview.pending_rating?.id).toBe("ability");
+    expect(turn.reply.text).toMatch(/^Sorry, that wasn't clear\..*\?$/);
+    expect(await sql()`select 1 from public.ratings where interview_id = ${interview.id}`).toHaveLength(0);
+    turn = await sendTurn(ctx, { interview_id: interview.id, text: "Yes, with the guide beside me", mode: "voice" });
+    expect(turn.interview.pending_rating?.id).toBe("pace");
+    expect(await sql()`select choice from public.ratings where interview_id = ${interview.id}`).toEqual([{ choice: "yes_with_guide" }]);
+  });
+
+  it("saves no rating on a turn where the learner asked what the question means", async () => {
+    overrideStubBrain("interviewer", (call) =>
+      call.toolResults.length
+        ? { text: JSON.stringify({ reply: "Sorry, that wasn't clear. Could you do it on your own now?", topic_action: "stay", learner_declined: false, offered_to_post_question: false, learner_asked_to_explain: true }) }
+        : { toolCalls: [{ name: "save_rating", input: { item_id: "ability", choice: "prefer_not_to_say" } }] },
+    );
+    const s = await openSession("Confusion isn't a rating");
+    const ctx = await ctxAs("elena");
+    const { interview } = await startInterview(ctx, { session_id: s.id, anonymity: "anonymous", kind: "session" });
+    await sendTurn(ctx, { interview_id: interview.id, text: "Ready", mode: "text" });
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "Your questions are very confusing.", mode: "voice" });
+    expect(turn.interview.pending_rating?.id).toBe("ability");
+    expect(await sql()`select 1 from public.ratings where interview_id = ${interview.id}`).toHaveLength(0);
+  });
+
+  it("says there's nothing to summarise when the learner stops before saying anything in the conversation", async () => {
+    const { ctx, interview } = await toConversationAs("chloe", "Stopped at once");
+    const turn = await sendTurn(ctx, { interview_id: interview.id, text: "I'd like to stop the interview actually.", mode: "voice" });
+    expect(turn.interview.stage).toBe("read_back");
+    // A model asked to summarise nothing wrote "You asked to stop the interview…".
+    expect(turn.interview.summary).toEqual([NOTHING_TO_SUMMARISE]);
+    expect(turn.reply.text).toBe("Okay, let's stop there. You didn't add anything beyond the ratings, so the summary on your screen just says that. Add anything you'd like there, then submit.");
   });
 });

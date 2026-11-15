@@ -24,30 +24,27 @@ async function installFakeVoice(page: Page, opts: { refuseMicrophone?: boolean }
     if (refuse) return;
     w.__vocalBridgeFactory = () => {
       const handlers: Record<string, Array<(e: unknown) => void>> = {};
-      let turns = 0;
+      let query: ((q: string) => Promise<string>) | null = null;
       const fake = {
-        responses: [] as Array<{ turnId: string; response: string }>,
+        spoken: [] as string[],
         readAloud: [] as string[],
         async sendAction(action: string, payload?: { text?: string }) {
           if (action === "read_aloud") fake.readAloud.push(payload?.text ?? "");
         },
-        async sendAIAgentResponse(turnId: string, response: string) {
-          fake.responses.push({ turnId, response });
-        },
         on(event: string, h: (e: unknown) => void) {
           (handlers[event] ??= []).push(h);
+        },
+        onAIAgentQuery(h: (q: string) => Promise<string>) {
+          query = h;
         },
         async connect() {},
         async disconnect() {},
         async setMicrophoneEnabled() {},
-        /** Speaks a turn and resolves with everything the agent was sent for it: the acknowledgement, then the reply. */
         async say(text: string) {
-          const turnId = `turn-${++turns}`;
           for (const h of handlers.transcript ?? []) h({ role: "user", text: text.slice(0, 10) });
-          for (const h of handlers.aiAgentQuery ?? []) h({ query: text, turnId });
-          const mine = () => fake.responses.filter((r) => r.turnId === turnId).map((r) => r.response);
-          while (mine().length < 2) await new Promise((r) => setTimeout(r, 50));
-          return mine();
+          const reply = await query!(text);
+          fake.spoken.push(reply);
+          return reply;
         },
       };
       w.__fakeVoice = fake;
@@ -76,16 +73,11 @@ test("the microphone asks for permission, spoken turns appear marked with a micr
   await expect.poll(readAloud).toHaveLength(1);
   expect((await readAloud())[0]).toContain("Could you now do what this session taught");
 
-  const say = (t: string) => page.evaluate((text) => (window as unknown as { __fakeVoice: { say: (t: string) => Promise<string[]> } }).__fakeVoice.say(text), t);
-  // A spoken turn is acknowledged straight away, then answered on the same turn.
-  const [ack, reply] = await say("Yes, with the guide beside me");
-  expect(ack).toBe("Got it.");
+  const reply = await page.evaluate(() => (window as unknown as { __fakeVoice: { say: (t: string) => Promise<string> } }).__fakeVoice.say("Yes, with the guide beside me"));
   expect(reply).toMatch(/pace/i);
   // The reply is spoken as the turn's answer, so it isn't read aloud a second time.
   await expect(page.getByTestId("interviewer-bubble").last()).toContainText(/pace/i);
   expect(await readAloud()).toHaveLength(1);
-  // The acknowledgement is only spoken: it isn't part of the transcript.
-  await expect(page.getByTestId("interviewer-bubble").filter({ hasText: "Got it." })).toHaveCount(0);
 
   // A chip tap while listening: its next question is read aloud.
   await page.getByTestId("rating-chip").filter({ hasText: "About right" }).click();

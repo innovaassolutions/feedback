@@ -17,7 +17,7 @@ Last checked on 15 November 2026: `npm run check` passes (type check, lint, 107 
 | 7. Branding and a new tenant | The Brand designer, contrast adjustment, the preview and approval page, theme history, organization and course creation |
 | 8. Quality, reminders and follow-up | `agent_runs` for every agent call, the rubric job, the quality page, alerts, the review queue and labelled-set candidates, the eval merge gate in CI, reminders, the follow-up interview, retention and a learner's removal request |
 
-The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.6.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
+The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.7.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
 
 ## How to run it
 
@@ -68,9 +68,9 @@ npm run evals:gate -- --base origin/main   # what CI runs: every changed AGENT.m
 
 `npm run evals` plays eight scripted learner personas against the real Interviewer and scores each transcript on the rubric (limits and coverage in code, the rest by a judge model), then runs the Analyst on twelve hand-labelled transcripts. Pass marks: 90% of rubric items, 85% theme agreement. Reports go to `evals/reports/` with every agent's `AGENT.md` version.
 
-**Latest eval results (15 November 2026, Claude Sonnet 5.5 through the AI Gateway): rubric 97.7%, themes 95.8%, median Interviewer reply 2.9 s (90th percentile 6.4 s)**, for Interviewer 1.6.0 and Analyst 1.0.0, scored by judge 1.1.0. The report is `evals/reports/2026-11-15T06-46-08-492Z-model-interviewer-1.6.0-analyst-1.0.0.json`. Reports now include the Interviewer's reply time. Stub reports are ignored by git and by the gate.
+**Latest eval results (15 November 2026, Claude Sonnet 5.5 through the AI Gateway): rubric 97.7%, themes 95.8%, median Interviewer reply 2.9 s (90th percentile 6.2 s)**, for Interviewer 1.7.0 and Analyst 1.0.0, scored by judge 1.1.0. The report is `evals/reports/2026-11-15T09-45-19-824Z-model-interviewer-1.7.0-analyst-1.0.0.json`. Reports now include the Interviewer's reply time. Stub reports are ignored by git and by the gate.
 
-The Interviewer took six versions to get there. Every report is kept in `evals/reports/`:
+The Interviewer took six versions to pass, and has changed since after voice trials. Every report is kept in `evals/reports/`:
 
 | Interviewer | Rubric | What the run showed, and what changed next |
 | --- | --- | --- |
@@ -80,7 +80,8 @@ The Interviewer took six versions to get there. Every report is kept in `evals/r
 | 1.3.0 | 78.6% | Six failures, all on describing the last session's change, which the judge reads as leading |
 | 1.4.0 | 97.7% | Passed, but a live run sent blocker alerts with the summary "placeholder". A blocker alert now also needs `learner_is_blocked` in the reply and a real summary |
 | 1.5.0 | 100% | The voice trial showed requests at the read-back ("can we start again?") folded into the summary. The read-back now tells corrections from anything else |
-| 1.6.0 | 97.7% | Also run with Claude Haiku 5.5 for speed: 83.7%, so voice stays on Sonnet 5.5 |
+| 1.6.0 | 97.7% | Also run with Claude Haiku 5.5 for speed: 83.7%, so voice stays on Sonnet 5.5. A voice trial then showed "I don't understand the question" skipping the item, a complaint saved as "Prefer not to say", and a summary about the interview itself after an early stop |
+| 1.7.0 | 97.7% | A rating question the learner didn't understand is explained once more, and no rating is saved on that turn. The confused beginner now asks once: the explanation worked, but with two explanations and a Q&A offer the persona reached the 14-turn limit before the last topic, its one miss |
 
 Theme agreement stayed between 93.8% and 95.8% on Analyst 1.0.0 throughout.
 
