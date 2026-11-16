@@ -6,6 +6,7 @@ import { enqueue } from "@/lib/server/jobs/queue";
 import { chunkText, storableText } from "@/lib/server/librarian/chunk";
 import { errorName } from "@/lib/server/ai/runs";
 import { embedTexts } from "./reading";
+import { pagesFromScript, scriptUrls } from "./embedded-docs";
 import { toVector } from "./tools";
 
 /** Job: an instructor's written or verified answer becomes a source; anything else stops being one. */
@@ -34,7 +35,14 @@ export async function indexVerifiedAnswer(payload: { answer_id: string }, deps: 
 }
 
 export const USER_AGENT = "CourseFeedbackLibrarian/1.0";
-export const MAX_PAGES = 500;
+export const MAX_PAGES = 1000;
+/** A JavaScript documentation app's script can carry every page; read up to this much of it. */
+const MAX_SCRIPT_BYTES = 20 * 1024 * 1024;
+/** Pages embedded and stored together, so a long read keeps its progress if it's cut off. */
+const PAGES_PER_BATCH = 80;
+const CHUNKS_PER_EMBED = 200;
+/** Embedding calls made at once for a batch. */
+const PARALLEL_EMBEDS = 4;
 const MAX_BYTES = 2 * 1024 * 1024;
 
 export type Fetcher = (url: string) => Promise<Response>;
@@ -52,7 +60,8 @@ export function inScope(candidate: URL, root: URL): boolean {
   if (candidate.protocol !== "https:" && candidate.protocol !== "http:") return false;
   if (candidate.host !== root.host) return false;
   const base = root.pathname.endsWith("/") ? root.pathname : root.pathname.replace(/\/[^/]*$/, "/");
-  return candidate.pathname === root.pathname || candidate.pathname.startsWith(base);
+  // "/docs" is the same section as "/docs/": a site may show its home page without the slash.
+  return candidate.pathname === root.pathname || `${candidate.pathname}/` === root.pathname || candidate.pathname.startsWith(base);
 }
 
 export function pageText(html: string): { title: string; text: string; links: string[] } {
@@ -97,6 +106,7 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
     const pages = new Map<string, { title: string; text: string; hash: string }>();
     // Why the address itself gave nothing, said to the admin if no page at all could be read.
     let startProblem: string | null = null;
+    let startHtml: string | null = null;
     while (queue.length && pages.size < MAX_PAGES) {
       const url = queue.shift()!;
       const first = url === start;
@@ -128,6 +138,7 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
         continue;
       }
       const html = (await res.text()).slice(0, MAX_BYTES);
+      if (first) startHtml = html;
       const page = pageText(html);
       if (page.text.length > 40) pages.set(url, { ...page, hash: createHash("sha256").update(page.text).digest("hex") });
       else if (first && !page.links.length) {
@@ -145,6 +156,26 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
           visited.add(key);
           queue.push(key);
         }
+      }
+    }
+
+    // A JavaScript documentation app: its pages may be carried as Markdown inside its script.
+    if (!pages.size && startHtml) {
+      for (const scriptUrl of scriptUrls(startHtml, start)) {
+        let res: Response;
+        try {
+          res = await fetcher(scriptUrl);
+        } catch {
+          continue;
+        }
+        if (!res.ok) continue;
+        const script = await res.text();
+        if (script.length > MAX_SCRIPT_BYTES) continue;
+        for (const page of pagesFromScript(script, (u) => inScope(u, root) && allowed(u.toString()), root.origin)) {
+          if (pages.size >= MAX_PAGES) break;
+          if (!pages.has(page.url)) pages.set(page.url, { title: page.title, text: page.text, hash: createHash("sha256").update(page.text).digest("hex") });
+        }
+        if (pages.size) break;
       }
     }
 
@@ -169,27 +200,41 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
     const removed = [...stored.keys()].filter((u) => !pages.has(u));
     if (removed.length) await db.from("document_chunks").delete().eq("documentation_source_id", source.id).in("page_url", removed);
 
-    for (const [url, page] of pages) {
-      if (stored.get(url) === page.hash) continue; // unchanged
-      const chunks = chunkText(page.text);
-      const embeddings = await embedTexts(db, chunks.map((c) => `${page.title}\n${c.content}`), { organizationId: source.organization_id, operation: "embed_documentation" });
-      await db.from("document_chunks").delete().eq("documentation_source_id", source.id).eq("page_url", url);
-      const { error } = await db.from("document_chunks").insert(
-        chunks.map((c, i) => ({
-          organization_id: source.organization_id,
-          course_id: null,
-          session_id: null,
-          source_kind: "documentation_page" as const,
-          documentation_source_id: source.id,
-          page_url: url,
-          page_hash: page.hash,
-          title: c.heading ? `${page.title} — ${c.heading}` : page.title || url,
-          content: c.content,
-          chunk_index: c.index,
-          embedding: toVector(embeddings[i]),
-        })),
-      );
-      if (error) throw new Error(`store page: ${error.code}`);
+    // Changed pages, a batch at a time: their chunks are embedded together, then stored, so a long
+    // read that's cut off keeps what it stored and the next attempt skips those pages.
+    const changed = [...pages].filter(([url, page]) => stored.get(url) !== page.hash);
+    for (let b = 0; b < changed.length; b += PAGES_PER_BATCH) {
+      const batch = changed.slice(b, b + PAGES_PER_BATCH).map(([url, page]) => ({ url, page, chunks: chunkText(page.text) }));
+      const texts = batch.flatMap(({ page, chunks }) => chunks.map((c) => `${page.title}\n${c.content}`));
+      const groups: string[][] = [];
+      for (let i = 0; i < texts.length; i += CHUNKS_PER_EMBED) groups.push(texts.slice(i, i + CHUNKS_PER_EMBED));
+      const vectors: number[][] = [];
+      for (let g = 0; g < groups.length; g += PARALLEL_EMBEDS) {
+        const done = await Promise.all(groups.slice(g, g + PARALLEL_EMBEDS).map((group) => embedTexts(db, group, { organizationId: source.organization_id, operation: "embed_documentation" })));
+        for (const v of done) vectors.push(...v);
+      }
+      let offset = 0;
+      for (const { url, page, chunks } of batch) {
+        const embeddings = vectors.slice(offset, offset + chunks.length);
+        offset += chunks.length;
+        await db.from("document_chunks").delete().eq("documentation_source_id", source.id).eq("page_url", url);
+        const { error } = await db.from("document_chunks").insert(
+          chunks.map((c, i) => ({
+            organization_id: source.organization_id,
+            course_id: null,
+            session_id: null,
+            source_kind: "documentation_page" as const,
+            documentation_source_id: source.id,
+            page_url: url,
+            page_hash: page.hash,
+            title: c.heading ? `${page.title} — ${c.heading}` : page.title || url,
+            content: c.content,
+            chunk_index: c.index,
+            embedding: toVector(embeddings[i]),
+          })),
+        );
+        if (error) throw new Error(`store page: ${error.code}`);
+      }
     }
     await db
       .from("documentation_sources")

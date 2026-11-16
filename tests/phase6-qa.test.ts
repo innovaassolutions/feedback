@@ -228,6 +228,7 @@ describe("documentation sites", () => {
   let server: Server;
   let base: string;
   const pages: Record<string, string> = {};
+  const scripts: Record<string, string> = {};
   const page = (title: string, body: string, links: string[] = []) =>
     `<html><head><title>${title}</title></head><body><nav><a href="/docs/">Home</a></nav><main><h1>${title}</h1><p>${body}</p>${links.map((l) => `<a href="${l}">${l}</a>`).join(" ")}</main></body></html>`;
 
@@ -237,6 +238,10 @@ describe("documentation sites", () => {
       if (path === "/robots.txt") {
         res.writeHead(200, { "content-type": "text/plain" });
         return res.end("User-agent: *\nDisallow: /docs/private\n");
+      }
+      if (scripts[path]) {
+        res.writeHead(200, { "content-type": "text/javascript" });
+        return res.end(scripts[path]);
       }
       const html = pages[path];
       if (!html) {
@@ -301,6 +306,26 @@ describe("documentation sites", () => {
     expect(row).toMatchObject({ status: "ready", page_count: 1 });
     const [chunk] = await sql()`select title, content from public.document_chunks where documentation_source_id = ${source.id}`;
     expect(chunk).toMatchObject({ title: "Export notes — Export notes", content: expect.stringContaining("Exported text with a stray NUL") });
+  });
+
+  it("reads a JavaScript documentation app from the Markdown carried in its script", async () => {
+    // Every address on the site returns the same empty page; the text is in the script.
+    const shell = '<html><head><title>Docs</title><script type="module" src="/spa/assets/index.js"></script></head><body><div id=root></div></body></html>';
+    pages["/spa/"] = shell;
+    scripts["/spa/assets/index.js"] = [
+      'const BRAND_NAME="Northwind",y=2;',
+      "var a=`---\\ntitle: Portal basics\\n---\\nThe {{BRAND_NAME}} portal keeps every customer account in one place, with its milestones and invoices.`,",
+      "b=`---\\ntitle: Exports\\n---\\nExport a customer's invoices from the Billing screen as a CSV file, one row per invoice.`;",
+      'const modules=Object.assign({"/content/spa/index.md":a,"/content/spa/billing/exports.md":b});',
+    ].join("\n");
+    const owen = await ctxAs("owen");
+    const { source } = await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/spa/` });
+    await owen.runJobs();
+    const [row] = await sql()`select status, page_count, error from public.documentation_sources where id = ${source.id}`;
+    expect(row).toMatchObject({ status: "ready", page_count: 2 });
+    expect((await pagesStored(source.id)).map((p) => p[0])).toEqual(["/spa", "/spa/billing/exports"]);
+    const [chunk] = await sql()`select content from public.document_chunks where documentation_source_id = ${source.id} and page_url like '%/spa'`;
+    expect(chunk.content).toContain("The Northwind portal keeps every customer account");
   });
 
   it("says why a site couldn't be read instead of calling it ready, and keeps pages read before", async () => {

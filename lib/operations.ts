@@ -51,6 +51,12 @@ export const operations = {
       known_issues: z.array(text(300)).max(20),
     }),
   ),
+  draft_brief: op(
+    "POST",
+    "/api/sessions/{session_id}/brief/draft",
+    "Asks the Librarian to draft the session brief again from the session's documents",
+    z.object({ session_id: id }),
+  ),
   add_documentation_source: op(
     "POST",
     "/api/organizations/{organization_id}/documentation",

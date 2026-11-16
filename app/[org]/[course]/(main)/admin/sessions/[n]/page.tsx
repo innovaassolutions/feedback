@@ -9,7 +9,7 @@ import { StateButton } from "@/components/admin/state-button";
 import { DocumentsPanel } from "@/components/admin/documents-panel";
 import { BriefEditor } from "@/components/admin/brief-editor";
 import { JoinLink } from "@/components/join-link";
-import { DeleteButton, EditForm } from "@/components/admin/edit-forms";
+import { ActionButton, DeleteButton, EditForm } from "@/components/admin/edit-forms";
 
 type Brief = { objectives: string[]; topics: string[]; known_issues: string[] };
 
@@ -94,6 +94,18 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
         <Card>
           <h2 className="mb-1 text-lg font-semibold">2. Session brief</h2>
           <p className="mb-3 text-sm text-muted">What the session set out to teach. The feedback interview asks about it once you approve it.</p>
+          {(documents ?? []).some((d) => d.status === "ready") ? (
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+              <ActionButton
+                path={`/api/sessions/${session.id}/brief/draft`}
+                label={session.brief_draft_at ? "Draft the brief again from the documents" : "Draft the brief from the documents"}
+                done="Drafting… refresh in a minute"
+              />
+              {!session.brief_draft_at && !session.brief_approved_at ? (
+                <span className="text-muted">No draft yet. If none appears a minute after the documents are read, ask for one.</span>
+              ) : null}
+            </div>
+          ) : null}
           <BriefEditor
             key={`${session.brief_draft_at}-${session.brief_approved_at}`}
             sessionId={session.id}

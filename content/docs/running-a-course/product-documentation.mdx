@@ -7,10 +7,11 @@ This is optional. If your course teaches a product with public help or documenta
 
 Under **Course setup**, at the foot of the **Sessions** tab, under **Product documentation**, enter the **Documentation site**, such as `docs.streamspace.ai` (the `https://` is added for you), and choose **Add documentation**. This needs an organization admin.
 
-The site shows **Reading…** for a few minutes, then **Ready** with the number of pages read. If no page can be read it shows **Couldn't read** and why: the address can't be reached, there's no page there, the site needs a login, its robots rules don't allow reading, or its pages are built in the browser with JavaScript, which can't be read this way. Fix the address or choose **Remove**; **Read again** tries now.
+The site shows **Reading…** for a few minutes, then **Ready** with the number of pages read. If no page can be read it shows **Couldn't read** and why: the address can't be reached, there's no page there, the site needs a login, its robots rules don't allow reading, or its pages are built in the browser with JavaScript and the text couldn't be found. Fix the address or choose **Remove**; **Read again** tries now.
 
 - Only pages **under that address** are read. Links to other sites aren't followed.
-- The site's rules for robots are respected, and reading stops at 500 pages.
+- The site's rules for robots are respected, and reading stops at 1,000 pages.
+- Some documentation sites are JavaScript apps: every address returns the same empty page and the text is drawn in the browser. When the app carries its pages inside its script, as `studio-docs.streamspace.ai` does, they're read from there, each at its own address. Other apps show **Couldn't read** with the reason; ask the site's owner for a version with plain pages, or upload the documentation as session documents.
 - The site is **re-read every week**, so changed pages are updated and removed pages are dropped. If a re-read can't reach the site at all, the pages read before are kept and it tries again the next day.
 - Documentation belongs to the **organization**, so every course it runs can use it.
 

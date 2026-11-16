@@ -82,6 +82,12 @@ export async function trackRun<T>(
  * and that output can contain transcript text, which must never be logged.
  */
 export function errorName(err: unknown): string {
-  if (err instanceof Error) return err.name.slice(0, 100);
-  return "UnknownError";
+  if (!(err instanceof Error)) return "UnknownError";
+  // For output that didn't fit its schema, add the first failing rule (a path and a code), so a
+  // failure can be traced. Never the text itself.
+  type Issues = { issues?: Array<{ path?: unknown[]; code?: string }>; cause?: unknown };
+  const cause = (err as { cause?: unknown }).cause as Issues | undefined;
+  const issue = cause?.issues?.[0] ?? (cause?.cause as Issues | undefined)?.issues?.[0];
+  const detail = issue ? `: ${(issue.path ?? []).join(".") || "output"} ${issue.code ?? ""}`.trimEnd() : "";
+  return `${err.name}${detail}`.slice(0, 100);
 }

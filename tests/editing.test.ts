@@ -195,3 +195,16 @@ describe("organizations", () => {
     expect(await statusOf(updateOrganization(owen, { organization_id: org!.id, name: "Mine", slug: `mine-${stamp}` }))).toBe(403);
   });
 });
+
+describe("the session brief", () => {
+  it("can be drafted again from the session's read documents, and only by its managers", async () => {
+    const { requestBriefDraft } = await import("@/lib/server/ops/sessions");
+    const s = await newSession(ids.ime, "Brief again");
+    expect(await statusOf(requestBriefDraft(marcus, { session_id: s.id }))).toBe(422);
+    await sql()`insert into public.documents (organization_id, course_id, session_id, title, audience, storage_path, file_name, mime_type, size_bytes, status)
+      values (${ids.streamspace}, ${ids.ime}, ${s.id}, 'Slides', 'learners', ${`test/${crypto.randomUUID()}/s.md`}, 's.md', 'text/markdown', 10, 'ready')`;
+    expect(await requestBriefDraft(marcus, { session_id: s.id })).toEqual({ queued: true });
+    expect(await sql()`select id from public.jobs where kind = 'draft_brief' and payload ->> 'session_id' = ${s.id}`).not.toHaveLength(0);
+    expect(await statusOf(requestBriefDraft(ben, { session_id: s.id }))).toBe(404);
+  });
+});

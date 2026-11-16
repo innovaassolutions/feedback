@@ -1,9 +1,10 @@
 import type { Ctx } from "@/lib/server/ctx";
+import { enqueue } from "@/lib/server/jobs/queue";
 import type { OperationInput } from "@/lib/operations";
-import { conflict } from "@/lib/server/http";
+import { conflict, unprocessable } from "@/lib/server/http";
 import { nextSessionState, type SessionState } from "@/lib/labels";
 import type { TablesUpdate } from "@/lib/database.types";
-import { canManage, courseForUser, requireManage, sessionForUser } from "./common";
+import { canManage, courseForUser, kickJobs, requireManage, sessionForUser } from "./common";
 
 export async function listSessions(ctx: Ctx, input: OperationInput<"list_sessions">) {
   const course = await courseForUser(ctx, input.course_id);
@@ -119,4 +120,15 @@ export async function approveBrief(ctx: Ctx, input: OperationInput<"approve_brie
     .eq("id", session.id);
   if (error) throw new Error(`approve brief: ${error.message}`);
   return { brief };
+}
+
+/** Queues a fresh draft of the brief from the session's read documents, such as after a failed draft. */
+export async function requestBriefDraft(ctx: Ctx, input: OperationInput<"draft_brief">) {
+  const session = await sessionForUser(ctx, input.session_id);
+  await requireManage(ctx, session.course_id);
+  const { count } = await ctx.db.from("documents").select("id", { count: "exact", head: true }).eq("session_id", session.id).eq("status", "ready");
+  if (!count) throw unprocessable("Upload a document and wait until it's read; the brief is drafted from it.");
+  await enqueue(ctx.admin, { kind: "draft_brief", payload: { session_id: session.id }, organizationId: session.organization_id });
+  kickJobs(ctx);
+  return { queued: true };
 }

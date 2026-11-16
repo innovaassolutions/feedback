@@ -9,7 +9,7 @@ import { detectDocumentKind } from "@/lib/files";
 import { chunkText } from "@/lib/server/librarian/chunk";
 import { extractText, UnreadableDocument } from "@/lib/server/librarian/extract";
 import type { AdminClient } from "@/lib/server/supabase-admin";
-import { briefSchema, type Brief } from "./schema";
+import { briefDraftSchema, tidyBrief, type Brief } from "./schema";
 
 /** Embeds texts with the configured model and records the call. */
 export async function embedTexts(
@@ -117,9 +117,11 @@ export async function draftBrief(payload: { session_id: string }, deps: JobDeps)
       model: languageModel("librarian"),
       instructions: agent.instructions,
       prompt: `Task: draft_brief\n\n<context>${JSON.stringify(context)}</context>`,
-      output: Output.object({ schema: briefSchema }),
+      output: Output.object({ schema: briefDraftSchema }),
+      maxOutputTokens: 1500,
     });
-    const brief = briefSchema.parse(result.output);
+    const brief = tidyBrief(briefDraftSchema.parse(result.output));
+    if (!brief) throw Object.assign(new Error("The draft had no objective or no topic"), { name: "EmptyBrief" });
     await recordRun(
       db,
       { organizationId: session.organization_id, agent: "librarian", agentVersion: agent.version, model, operation: "draft_brief", sessionId: session.id },
