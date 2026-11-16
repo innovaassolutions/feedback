@@ -31,11 +31,13 @@ test("an instructor creates a session, uploads a document and sees it read", asy
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Date").fill("2026-12-11");
   await page.getByLabel("Objectives").fill("Try the admin pages.");
-  await page.getByRole("button", { name: "Create draft session" }).click();
+  await page.getByRole("button", { name: "Add session" }).click();
   const row = page.getByTestId("admin-sessions").getByRole("listitem").filter({ hasText: title });
   await expect(row).toContainText("Draft");
-  await row.getByRole("button", { name: "Move to Upcoming" }).click();
+  await expect(row).toContainText("Only instructors can see it.");
+  await row.getByRole("button", { name: "Show to learners" }).click();
   await expect(row).toContainText("Upcoming");
+  await expect(row).toContainText("No documents yet");
 
   await row.getByRole("link", { name: new RegExp(title) }).click();
   await page.getByLabel("File").setInputFiles({

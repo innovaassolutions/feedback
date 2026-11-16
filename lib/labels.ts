@@ -6,6 +6,22 @@ export const SESSION_STATE_LABEL = {
 } as const;
 
 export const SESSION_STATE_ORDER = ["draft", "scheduled", "open", "closed"] as const;
+
+/** The button that moves a session on, named for what it does. */
+export const SESSION_STATE_ACTION = {
+  draft: "Show to learners",
+  scheduled: "Open feedback",
+  open: "Close feedback",
+  closed: null,
+} as const;
+
+/** What a session's state means, in one line. */
+export function describeSessionState(state: "draft" | "scheduled" | "open" | "closed", closesAt: string | null): string {
+  if (state === "draft") return "Only instructors can see it.";
+  if (state === "scheduled") return "Learners can see it. Feedback opens when you open it, after the session.";
+  if (state === "open") return closesAt ? `Learners can give feedback until ${formatDate(closesAt)}.` : "Learners can give feedback.";
+  return "Feedback has ended. The Q&A board stays open.";
+}
 export type SessionState = (typeof SESSION_STATE_ORDER)[number];
 
 export function nextSessionState(state: SessionState): SessionState | null {

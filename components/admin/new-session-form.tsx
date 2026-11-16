@@ -36,7 +36,7 @@ export function NewSessionForm({ courseId }: { courseId: string }) {
       </div>
       {error ? <div className="sm:col-span-2"><Notice tone="danger">{error}</Notice></div> : null}
       <div>
-        <Button type="submit" disabled={busy}>{busy ? "Creating…" : "Create draft session"}</Button>
+        <Button type="submit" disabled={busy}>{busy ? "Adding…" : "Add session"}</Button>
       </div>
     </form>
   );

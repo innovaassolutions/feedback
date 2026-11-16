@@ -30,7 +30,7 @@ test("a learner signs in by magic link and lands on the course page", async ({ p
   await expect(list.getByRole("listitem").filter({ hasText: "Session 1" })).toContainText("Feedback open");
   await expect(list.getByRole("listitem").filter({ hasText: "Session 2" })).toContainText("Upcoming");
   await expect(list).not.toContainText("Session 3");
-  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Course setup" })).toHaveCount(0);
 });
 
 test("an instructor sees all three sessions and an Admin link", async ({ page }) => {
@@ -38,7 +38,7 @@ test("an instructor sees all three sessions and an Admin link", async ({ page })
   const list = page.getByTestId("session-list");
   await expect(list.getByRole("listitem")).toHaveCount(3);
   await expect(list.getByRole("listitem").filter({ hasText: "Session 3" })).toContainText("Draft");
-  await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Course setup" })).toBeVisible();
 });
 
 test("a learner gets Page not found on the admin page", async ({ page }) => {

@@ -58,9 +58,9 @@ test("a platform admin creates a third organization, previews and approves its t
   // A session, then invite a learner.
   await page.getByLabel("Title").fill("Welcome");
   await page.getByLabel("Date").fill("2026-12-01");
-  await page.getByRole("button", { name: "Create draft session" }).click();
+  await page.getByRole("button", { name: "Add session" }).click();
   await expect(page.getByTestId("admin-sessions")).toContainText("Welcome");
-  await page.getByRole("link", { name: "Roster" }).click();
+  await page.getByRole("link", { name: "Learners", exact: true }).click();
   const learnerEmail = `new.learner.${stamp}@harbour.example`;
   await page.getByLabel("Email addresses").fill(learnerEmail);
   await page.getByRole("button", { name: "Invite learners" }).click();

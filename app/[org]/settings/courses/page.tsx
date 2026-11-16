@@ -11,15 +11,30 @@ export default async function CoursesPage({ params }: PageProps<"/[org]/settings
   const { org } = await params;
   const branding = await requireBranding(org);
   const db = await createUserClient();
-  const { data: courses } = await db.from("courses").select("id, slug, title").eq("organization_id", branding.id).order("title");
+  const [{ data: courses }, { data: sessions }, { data: enrolled }] = await Promise.all([
+    db.from("courses").select("id, slug, title").eq("organization_id", branding.id).order("title"),
+    db.from("sessions").select("course_id").eq("organization_id", branding.id),
+    db.from("enrollments").select("course_id").eq("organization_id", branding.id),
+  ]);
+  const count = (rows: Array<{ course_id: string }> | null, id: string) => (rows ?? []).filter((r) => r.course_id === id).length;
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
   return (
     <>
       <PageTitle title="Courses" subtitle={branding.name} />
+      <p className="-mt-3 mb-6 max-w-3xl text-muted">
+        Each course is a series of sessions. Create the course here, then add its sessions, learners and documents in its setup.
+      </p>
       <Card className="mb-6">
         <ul className="divide-y divide-border" data-testid="course-list">
           {(courses ?? []).map((c) => (
-            <li key={c.id} className="py-2">
-              <Link href={`/${org}/${c.slug}/admin`}>{c.title}</Link>
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+              <span>
+                <Link href={`/${org}/${c.slug}/admin`} className="font-medium">{c.title}</Link>
+                <span className="block text-sm text-muted">
+                  {plural(count(sessions, c.id), "session")} · {plural(count(enrolled, c.id), "learner")}
+                </span>
+              </span>
+              <Link href={`/${org}/${c.slug}/admin`} className="text-sm">Set up sessions</Link>
             </li>
           ))}
           {courses?.length ? null : <li className="py-2 text-muted">No courses yet.</li>}

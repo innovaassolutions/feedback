@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCourse } from "@/lib/course";
 import { createUserClient } from "@/lib/supabase/server";
 import { requestOrigin } from "@/lib/request";
-import { SESSION_STATE_LABEL, formatDate } from "@/lib/labels";
+import { SESSION_STATE_LABEL, describeSessionState, formatDate } from "@/lib/labels";
 import { Badge, Card, PageTitle } from "@/components/ui";
 import { StateButton } from "@/components/admin/state-button";
 import { DocumentsPanel } from "@/components/admin/documents-panel";
@@ -28,7 +29,7 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
   const db = await createUserClient();
   const { data: session } = await db
     .from("sessions")
-    .select("id, number, title, date, state, objectives, brief, brief_draft, brief_draft_at, brief_approved_at")
+    .select("id, number, title, date, state, objectives, brief, brief_draft, brief_draft_at, brief_approved_at, closes_at")
     .eq("course_id", ctx.course.id)
     .eq("number", Number(n))
     .maybeSingle();
@@ -41,8 +42,18 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
   const joinUrl = `${await requestOrigin()}/${org}/${course}/sessions/${session.number}/interview`;
   const brief = (session.brief_approved_at ? session.brief : session.brief_draft) as Brief | null;
 
+  // The sessions either side, to move through the course's setup in order.
+  const { data: siblings } = await db.from("sessions").select("number, title").eq("course_id", ctx.course.id).order("number");
+  const at = (siblings ?? []).findIndex((x) => x.number === session.number);
+  const previous = at > 0 ? siblings![at - 1] : null;
+  const next = at >= 0 && at < (siblings ?? []).length - 1 ? siblings![at + 1] : null;
+  const base = `/${org}/${course}/admin`;
+
   return (
     <>
+      <nav aria-label="Breadcrumb" className="mb-2 text-sm text-muted">
+        <Link href={base}>All sessions</Link> <span aria-hidden="true">›</span> Session {session.number}
+      </nav>
       <PageTitle
         title={`Session ${session.number}: ${session.title}`}
         subtitle={formatDate(session.date)}
@@ -53,17 +64,18 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
           </>
         }
       />
+      <p className="-mt-3 mb-6 text-muted">{describeSessionState(session.state, session.closes_at)}</p>
       <div className="grid gap-6">
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Join link</h2>
-          <JoinLink url={joinUrl} />
-        </Card>
-        <Card>
-          <h2 className="mb-3 text-lg font-semibold">Documents</h2>
+          <h2 className="mb-1 text-lg font-semibold">1. Documents</h2>
+          <p className="mb-3 text-sm text-muted">
+            The session&apos;s slides, handouts and notes, and the transcript of its recording. The Librarian reads them to draft the brief and to answer learners&apos; questions. Upload the transcript as Agents only.
+          </p>
           <DocumentsPanel organizationId={ctx.course.organization_id} courseId={ctx.course.id} sessionId={session.id} documents={documents ?? []} waitingForBrief={waitingForBrief(documents ?? [], session.brief_draft_at)} />
         </Card>
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">Session brief</h2>
+          <h2 className="mb-1 text-lg font-semibold">2. Session brief</h2>
+          <p className="mb-3 text-sm text-muted">What the session set out to teach. The feedback interview asks about it once you approve it.</p>
           <BriefEditor
             key={`${session.brief_draft_at}-${session.brief_approved_at}`}
             sessionId={session.id}
@@ -72,7 +84,21 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
             draftAt={session.brief_draft_at}
           />
         </Card>
+        <Card>
+          <h2 className="mb-1 text-lg font-semibold">3. Feedback</h2>
+          <p className="mb-3 text-sm text-muted">
+            After the session, choose Open feedback at the top of this page, then share this link or put the QR code on the last slide. Learners also get a reminder by email.
+          </p>
+          <JoinLink url={joinUrl} />
+          <p className="mt-3 text-sm">
+            <Link href={`/${org}/${course}/sessions/${session.number}`}>See the session as learners do, with its Q&amp;A board</Link>
+          </p>
+        </Card>
       </div>
+      <nav aria-label="Other sessions" className="mt-6 flex flex-wrap justify-between gap-3 text-sm">
+        <span>{previous ? <Link href={`${base}/sessions/${previous.number}`}>← Session {previous.number}: {previous.title}</Link> : null}</span>
+        <span>{next ? <Link href={`${base}/sessions/${next.number}`}>Session {next.number}: {next.title} →</Link> : <Link href={base}>Add another session</Link>}</span>
+      </nav>
     </>
   );
 }
