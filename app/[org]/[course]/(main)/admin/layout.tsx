@@ -20,14 +20,18 @@ export default async function AdminLayout({ children, params }: LayoutProps<"/[o
         ) : null}
         Course setup
       </nav>
-      <p className="mb-3 mt-1 font-heading text-2xl font-semibold" data-testid="setup-course-title">
-        {ctx.course.title}
-      </p>
+      <div className="mb-3 mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className="font-heading text-2xl font-semibold" data-testid="setup-course-title">
+          {ctx.course.title}
+        </p>
+        <Link href={`${base}/details`} className="text-sm">Rename or change settings</Link>
+      </div>
       <SetupTabs
         tabs={[
           { href: base, label: "Sessions", match: [base, `${base}/sessions`] },
           { href: `${base}/roster`, label: "Learners", match: [`${base}/roster`] },
           { href: `${base}/guide`, label: "Interview guide", match: [`${base}/guide`] },
+          { href: `${base}/details`, label: "Course details", match: [`${base}/details`] },
         ]}
       />
       {children}

@@ -5,9 +5,11 @@ export default async function MainLayout({ children, params }: LayoutProps<"/[or
   const { org, course } = await params;
   const ctx = await requireCourse(org, course);
   const base = `/${org}/${course}`;
-  const nav: NavItem[] = [{ href: base, label: "Sessions" }];
+  // Instructors and admins set the course up and see it as learners do, so their first link is
+  // Course setup and the learners' page is called what it is. Learners and sponsors see Sessions.
+  const nav: NavItem[] = ctx.can.manage ? [{ href: `${base}/admin`, label: "Course setup" }] : [{ href: base, label: "Sessions" }];
   if (ctx.can.readResults) nav.push({ href: `${base}/dashboard`, label: "Dashboard" });
-  if (ctx.can.manage) nav.push({ href: `${base}/admin`, label: "Course setup" });
+  if (ctx.can.manage) nav.push({ href: base, label: "Learner view" });
   if (ctx.roles.has("org_admin") || ctx.roles.has("platform_admin")) {
     nav.push({ href: `/${org}/settings/brand`, label: "Branding" }, { href: `/${org}/settings/people`, label: "People" });
   }

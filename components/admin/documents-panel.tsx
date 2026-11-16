@@ -5,6 +5,7 @@ import { api } from "@/lib/client/api";
 import { browserClient } from "@/lib/supabase/browser";
 import { DOCUMENT_ACCEPT, MAX_DOCUMENT_BYTES, documentStoragePath } from "@/lib/files";
 import { Badge, Button, Field, Notice, inputClass } from "@/components/ui";
+import { EditForm } from "@/components/admin/edit-forms";
 
 export type AdminDocument = {
   id: string;
@@ -88,6 +89,25 @@ export function DocumentsPanel({
                 {d.file_name} · {(d.size_bytes / 1024).toFixed(0)} KB · {AUDIENCE_LABEL[d.audience]}
               </p>
               {d.status === "failed" && d.error ? <p className="mt-1 text-sm text-danger" role="alert">{d.error}</p> : null}
+              <div className="mt-2">
+                <EditForm
+                  toggle="Edit"
+                  path={`/api/documents/${d.id}`}
+                  fields={[
+                    { name: "title", label: "Title", value: d.title },
+                    {
+                      name: "audience",
+                      label: "Who can see it",
+                      type: "select",
+                      value: d.audience,
+                      options: [
+                        { value: "learners", label: AUDIENCE_LABEL.learners },
+                        { value: "agents_only", label: AUDIENCE_LABEL.agents_only },
+                      ],
+                    },
+                  ]}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge tone={d.status === "ready" ? "success" : d.status === "failed" ? "danger" : "neutral"}>{STATUS_LABEL[d.status]}</Badge>

@@ -3,6 +3,7 @@ import { requireBranding } from "@/lib/branding";
 import { createUserClient } from "@/lib/supabase/server";
 import { Card, PageTitle } from "@/components/ui";
 import { AddStaffForm, RemoveButton } from "@/components/admin/people-forms";
+import { EditForm } from "@/components/admin/edit-forms";
 
 type Person = { id: string; user_id: string; display_name: string; email: string };
 
@@ -15,11 +16,14 @@ function PeopleList({ people, role, selfId, canRemoveSelf, empty }: { people: Pe
           <span>
             {p.display_name} <span className="text-sm text-muted">{p.email}</span>
           </span>
-          {p.user_id === selfId && !canRemoveSelf ? (
-            <span className="text-sm text-muted">You</span>
-          ) : (
-            <RemoveButton path={`/api/staff/${p.id}`} what={`${p.display_name} as ${role}`} />
-          )}
+          <span className="flex flex-wrap items-start gap-3">
+            <EditForm toggle="Edit name" path={`/api/staff/${p.id}`} fields={[{ name: "display_name", label: "Name", value: p.display_name }]} />
+            {p.user_id === selfId && !canRemoveSelf ? (
+              <span className="text-sm text-muted">You</span>
+            ) : (
+              <RemoveButton path={`/api/staff/${p.id}`} what={`${p.display_name} as ${role}`} />
+            )}
+          </span>
         </li>
       ))}
     </ul>

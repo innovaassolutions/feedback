@@ -9,6 +9,7 @@ import { StateButton } from "@/components/admin/state-button";
 import { DocumentsPanel } from "@/components/admin/documents-panel";
 import { BriefEditor } from "@/components/admin/brief-editor";
 import { JoinLink } from "@/components/join-link";
+import { DeleteButton, EditForm } from "@/components/admin/edit-forms";
 
 type Brief = { objectives: string[]; topics: string[]; known_issues: string[] };
 
@@ -64,7 +65,24 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
           </>
         }
       />
-      <p className="-mt-3 mb-6 text-muted">{describeSessionState(session.state, session.closes_at)}</p>
+      <p className="-mt-3 mb-3 text-muted">{describeSessionState(session.state, session.closes_at)}</p>
+      <div className="mb-6 flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <EditForm
+            toggle="Edit details"
+            path={`/api/sessions/${session.id}`}
+            redirect={`${base}/sessions/{number}`}
+            testId="session-details"
+            fields={[
+              { name: "number", label: "Session number", type: "number", value: session.number, min: 1, max: 999, hint: "Its place in the course" },
+              { name: "date", label: "Date", type: "date", value: session.date },
+              { name: "title", label: "Title", value: session.title, wide: true },
+              { name: "objectives", label: "Objectives", type: "textarea", value: session.objectives ?? "", hint: "What learners should be able to do afterwards" },
+            ]}
+          />
+        </div>
+        <DeleteButton path={`/api/sessions/${session.id}`} what={`Session ${session.number}`} label="Delete session" redirect={base} testId="delete-session" />
+      </div>
       <div className="grid gap-6">
         <Card>
           <h2 className="mb-1 text-lg font-semibold">1. Documents</h2>

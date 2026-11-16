@@ -34,7 +34,10 @@ export default async function CoursesPage({ params }: PageProps<"/[org]/settings
                   {plural(count(sessions, c.id), "session")} · {plural(count(enrolled, c.id), "learner")}
                 </span>
               </span>
-              <Link href={`/${org}/${c.slug}/admin`} className="text-sm">Set up sessions</Link>
+              <span className="flex gap-4 text-sm">
+                <Link href={`/${org}/${c.slug}/admin`}>Set up sessions</Link>
+                <Link href={`/${org}/${c.slug}/admin/details`}>Rename or delete</Link>
+              </span>
             </li>
           ))}
           {courses?.length ? null : <li className="py-2 text-muted">No courses yet.</li>}

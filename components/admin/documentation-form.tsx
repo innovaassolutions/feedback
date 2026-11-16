@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { Badge, Button, Field, Notice, inputClass } from "@/components/ui";
+import { ActionButton, DeleteButton } from "@/components/admin/edit-forms";
 
 type Source = { id: string; url: string; status: "processing" | "ready" | "failed"; page_count: number; error: string | null; last_read_at: string | null };
 
@@ -27,9 +28,11 @@ export function DocumentationForm({ organizationId, sources }: { organizationId:
         {sources.map((s) => (
           <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
             <span className="break-all">{s.url}</span>
-            <span className="flex items-center gap-2 text-sm text-muted">
+            <span className="flex flex-wrap items-center gap-2 text-sm text-muted">
               {s.page_count} pages
               <Badge tone={s.status === "ready" ? "success" : s.status === "failed" ? "danger" : "neutral"}>{s.status === "processing" ? "Reading…" : s.status === "ready" ? "Ready" : "Failed"}</Badge>
+              {s.status !== "processing" ? <ActionButton path={`/api/documentation/${s.id}/refresh`} label="Read again" done="Reading…" /> : null}
+              <DeleteButton path={`/api/documentation/${s.id}`} what={s.url} label="Remove" />
             </span>
           </li>
         ))}

@@ -13,6 +13,8 @@ test("an organization admin adds a sponsor, who is emailed an invitation, and re
   await form.getByLabel("Email address").fill(email);
   await form.getByRole("radio", { name: /Sponsor/ }).check();
   await expect(form.getByText("For executives and managers.")).toBeVisible();
+  // Other tests may add courses to the organization while this runs, so choose this one by name.
+  await form.locator('select[name="course_id"]').selectOption({ label: "Streamspace platform training: IME Engineering" });
   await form.getByRole("button", { name: "Add and email a sign-in link" }).click();
   await expect(form.getByText("Added Jordan Exec as sponsor on Streamspace platform training: IME Engineering. A sign-in email is on its way to them.")).toBeVisible();
 

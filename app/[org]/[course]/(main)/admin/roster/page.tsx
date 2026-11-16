@@ -2,6 +2,7 @@ import { requireCourse } from "@/lib/course";
 import { createUserClient } from "@/lib/supabase/server";
 import { Card, PageTitle } from "@/components/ui";
 import { InviteForm } from "@/components/admin/invite-form";
+import { DeleteButton, EditForm } from "@/components/admin/edit-forms";
 
 export default async function RosterPage({ params }: PageProps<"/[org]/[course]/admin/roster">) {
   const { org, course } = await params;
@@ -23,9 +24,14 @@ export default async function RosterPage({ params }: PageProps<"/[org]/[course]/
         <h2 className="mb-3 text-lg font-semibold">Learners</h2>
         <ul className="divide-y divide-border" data-testid="roster">
           {(learners ?? []).map((l) => (
-            <li key={l.id} className="flex flex-wrap justify-between gap-2 py-2">
-              <span>{l.display_name}</span>
-              <span className="text-sm text-muted">{l.email}</span>
+            <li key={l.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
+              <span className="min-w-0">
+                {l.display_name} <span className="text-sm text-muted">{l.email}</span>
+              </span>
+              <span className="flex flex-wrap items-start gap-2">
+                <EditForm toggle="Edit name" path={`/api/enrollments/${l.id}`} fields={[{ name: "display_name", label: "Name", value: l.display_name }]} />
+                <DeleteButton path={`/api/enrollments/${l.id}`} what={`${l.display_name} from the course`} label="Remove" />
+              </span>
             </li>
           ))}
         </ul>
