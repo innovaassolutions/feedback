@@ -33,6 +33,12 @@ export const operations = {
     "Stores the file and queues it for reading",
     z.object({ session_id: id, title: text(200), audience: z.enum(["learners", "agents_only"]), file: z.instanceof(File) }),
   ),
+  register_document: op(
+    "POST",
+    "/api/sessions/{session_id}/documents/uploaded",
+    "Checks a document the browser stored directly in the session's folder, then queues it for reading",
+    z.object({ session_id: id, document_id: id, file_name: text(255), title: text(200), audience: z.enum(["learners", "agents_only"]) }),
+  ),
   remove_document: op("DELETE", "/api/documents/{document_id}", "Removes a document and its chunks", z.object({ document_id: id })),
   approve_brief: op(
     "POST",

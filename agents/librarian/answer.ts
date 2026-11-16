@@ -7,8 +7,8 @@ import { errorName, recordRun } from "@/lib/server/ai/runs";
 import { emailInstructors } from "@/lib/server/notify";
 import type { Json } from "@/lib/database.types";
 import type { AdminClient } from "@/lib/server/supabase-admin";
-import { answerSchema } from "./schema";
-import { librarianTools, searchSources, type SourceHit } from "./tools";
+import { answerSchema, type LibrarianAnswer } from "./schema";
+import { librarianTools, searchSources, type Search, type SourceHit } from "./tools";
 
 /** Search steps plus the final answer. */
 const ANSWER_STEPS = 5;
@@ -76,6 +76,31 @@ async function sendToInstructor(deps: JobDeps, q: { id: string; course_id: strin
 }
 
 /**
+ * The Librarian drafts an answer: it searches with its tool, then answers or declines. The answer
+ * job and the eval set both run this, with a search over the database or over fixtures.
+ */
+export async function draftAnswer(
+  input: { question: string; session: { number: number; title: string }; search: Search },
+  instructions: string,
+) {
+  const seen = new Map<string, SourceHit>();
+  const session = `Session ${input.session.number}: ${input.session.title}`;
+  const result = await generateText({
+    model: languageModel("librarian"),
+    instructions,
+    prompt: `Task: answer_question\n\n<context>${JSON.stringify({ task: "answer_question", question: input.question, session })}</context>\n\nThe question was asked on the Q&A board for ${session}.\n\nThe learner's question: ${input.question}`,
+    tools: librarianTools(input.search, seen),
+    // The last step offers no tools, so the model answers from what it found instead of searching
+    // until the steps run out (a real model searched six times and never answered).
+    prepareStep: ({ stepNumber }) => (stepNumber >= ANSWER_STEPS - 1 ? { activeTools: [] } : {}),
+    output: Output.object({ schema: answerSchema }),
+    stopWhen: isStepCount(ANSWER_STEPS),
+    maxOutputTokens: 1200,
+  });
+  return { output: answerSchema.parse(result.output) as LibrarianAnswer, seen, usage: result.totalUsage, providerMetadata: result.providerMetadata };
+}
+
+/**
  * Job: the Librarian answers a question from the course's sources, or sends it to the
  * instructor. Nothing relevant enough found means no answer: the question moves to
  * needs_instructor without calling the model.
@@ -84,7 +109,7 @@ export async function answerQuestion(payload: { question_id: string }, deps: Job
   const db = deps.admin;
   const { data: q } = await db
     .from("questions")
-    .select("id, organization_id, course_id, session_id, author_id, text, state, sessions!inner(number), courses!inner(slug, organizations!inner(slug))")
+    .select("id, organization_id, course_id, session_id, author_id, text, state, sessions!inner(number, title), courses!inner(slug, organizations!inner(slug))")
     .eq("id", payload.question_id)
     .maybeSingle();
   if (!q || q.state !== "open") return "skipped";
@@ -103,31 +128,22 @@ export async function answerQuestion(payload: { question_id: string }, deps: Job
   };
 
   const searchMeta = { organizationId: q.organization_id, questionId: q.id, sessionId: q.session_id, learnerId: q.author_id };
-  const first = await searchSources(db, q.course_id, q.text, searchMeta);
+  const search: Search = (query, scope) => searchSources(db, q.course_id, q.session_id, query, searchMeta, scope);
+  const first = await search(q.text, "everything");
   if (!first.length) {
     await db.from("questions").update({ state: "needs_instructor" }).eq("id", q.id);
     await sendToInstructor(deps, info, "The course's sources don't cover this question.");
     return "needs_instructor";
   }
 
-  const seen = new Map<string, SourceHit>();
+  let seen = new Map<string, SourceHit>();
   const started = performance.now();
-  let output: ReturnType<typeof answerSchema.parse> | null = null;
+  let output: LibrarianAnswer | null = null;
   try {
-    const result = await generateText({
-      model: languageModel("librarian"),
-      instructions: agent.instructions,
-      prompt: `Task: answer_question\n\n<context>${JSON.stringify({ task: "answer_question", question: q.text })}</context>\n\nThe learner's question: ${q.text}`,
-      tools: librarianTools(db, q.course_id, seen, searchMeta),
-      // The last step offers no tools, so the model answers from what it found instead of searching
-      // until the steps run out (a real model searched six times and never answered).
-      prepareStep: ({ stepNumber }) => (stepNumber >= ANSWER_STEPS - 1 ? { activeTools: [] } : {}),
-      output: Output.object({ schema: answerSchema }),
-      stopWhen: isStepCount(ANSWER_STEPS),
-      maxOutputTokens: 1200,
-    });
-    output = answerSchema.parse(result.output);
-    await recordRun(db, meta, { outcome: "ok", usage: result.totalUsage, providerMetadata: result.providerMetadata, latencyMs: performance.now() - started });
+    const drafted = await draftAnswer({ question: q.text, session: { number: q.sessions.number, title: q.sessions.title }, search }, agent.instructions);
+    output = drafted.output;
+    seen = drafted.seen;
+    await recordRun(db, meta, { outcome: "ok", usage: drafted.usage, providerMetadata: drafted.providerMetadata, latencyMs: performance.now() - started });
   } catch (err) {
     await recordRun(db, meta, { outcome: "validation_failed", latencyMs: performance.now() - started, error: errorName(err) });
   }

@@ -1490,6 +1490,30 @@ export type Database = {
           title: string
         }[]
       }
+      match_chunks_grouped: {
+        Args: {
+          p_course_id: string
+          p_embedding: string
+          p_per_group: number
+          p_session_id: string
+        }
+        Returns: {
+          answer_id: string
+          content: string
+          document_id: string
+          file_name: string
+          id: string
+          mime_type: string
+          page_url: string
+          session_id: string
+          session_number: number
+          session_title: string
+          similarity: number
+          source_group: string
+          source_kind: Database["public"]["Enums"]["chunk_source_kind"]
+          title: string
+        }[]
+      }
       platform_admin_emails: { Args: never; Returns: string[] }
       platform_admins: {
         Args: never

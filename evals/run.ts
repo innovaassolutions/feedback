@@ -4,7 +4,12 @@
 // Set 1: eight scripted learner personas hold an interview with the real Interviewer; each is
 //        scored against the rubric (limits and coverage in code, the rest by a judge model).
 // Set 2: twelve hand-labelled transcripts check the Analyst's themes against a person's labels.
-// Pass marks: 90% of rubric items across the personas, 85% agreement on themes.
+// Set 3: eight questions on one session check the Librarian's answers from fixture sources: what
+//        the session covered, how-to steps from the product documentation, a disagreement between
+//        the two, a question the sources can't answer, and not naming a learner (evals/librarian.ts).
+// Pass marks: 90% of rubric items across the personas, 85% agreement on themes, 85% of Librarian cases.
+//
+// npm run evals -- --librarian   Set 3 only, while working on the Librarian (not valid for the merge gate)
 
 import "../scripts/load-env";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,6 +26,7 @@ import { LABELLED } from "@/agents/analyst/evals/labelled";
 import { THEMES } from "@/agents/analyst/schema";
 import { analyseTranscript } from "@/agents/analyst/analyse";
 import { codeChecks, judgeTranscript, readBackTurn, RUBRIC_ITEMS, JUDGE_VERSION, type RubricResult, type TranscriptTurn } from "@/lib/server/quality/rubric";
+import { PASS_LIBRARIAN, runLibrarianSet } from "./librarian";
 
 export const PASS_RUBRIC = 0.9;
 export const PASS_THEMES = 0.85;
@@ -132,6 +138,20 @@ const versions = Object.fromEntries(
   }),
 );
 
+const dir = path.join(process.cwd(), "evals", "reports");
+mkdirSync(dir, { recursive: true });
+
+if (process.argv.includes("--librarian")) {
+  console.log(`Running the Librarian set (${stub ? "stub dry run" : "real model"})…`);
+  const librarian = await runLibrarianSet(console.log);
+  const created = new Date().toISOString();
+  const only = { created_at: created, provider: stub ? "stub" : "gateway", valid_for_gate: false, models: { librarian: modelIdFor("librarian") }, versions, librarian };
+  const file = `${created.replace(/[:.]/g, "-")}-${stub ? "stub" : "model"}-librarian-${versions.librarian}-only.json`;
+  writeFileSync(path.join(dir, file), JSON.stringify(only, null, 2));
+  console.log(`\nLibrarian ${(librarian.pass_rate * 100).toFixed(1)}% (pass mark ${PASS_LIBRARIAN * 100}%)\nReport: evals/reports/${file}`);
+  process.exit(stub || librarian.passed ? 0 : 1);
+}
+
 console.log(`Running evals (${stub ? "stub dry run" : "real model"})…`);
 const personas = [];
 for (const p of PERSONAS) {
@@ -148,12 +168,13 @@ const latency = { turns: waits.length, median_ms: pct(0.5), p90_ms: pct(0.9), ma
 console.log(`  Interviewer reply time: median ${(latency.median_ms / 1000).toFixed(1)} s, 90th percentile ${(latency.p90_ms / 1000).toFixed(1)} s over ${latency.turns} turns`);
 const themes = await runLabelled();
 console.log(`  themes: ${(themes.agreement * 100).toFixed(1)}% agreement over ${themes.decisions} decisions`);
+const librarian = await runLibrarianSet(console.log);
 
 const report = {
   created_at: new Date().toISOString(),
   provider: stub ? "stub" : "gateway",
   valid_for_gate: !stub,
-  models: { interviewer: modelIdFor("interviewer"), analyst: modelIdFor("analyst"), judge: modelIdFor("judge") },
+  models: { interviewer: modelIdFor("interviewer"), analyst: modelIdFor("analyst"), librarian: modelIdFor("librarian"), judge: modelIdFor("judge") },
   interviewer_latency: latency,
   versions,
   judge_version: JUDGE_VERSION,
@@ -168,13 +189,12 @@ const report = {
     personas: personas.map((p) => ({ persona: p.persona, turns: p.turns, results: p.results })),
   },
   themes: { ...themes, pass_mark: PASS_THEMES, passed: themes.agreement >= PASS_THEMES },
+  librarian,
 };
-const dir = path.join(process.cwd(), "evals", "reports");
-mkdirSync(dir, { recursive: true });
 const name = `${report.created_at.replace(/[:.]/g, "-")}-${stub ? "stub" : "model"}-interviewer-${versions.interviewer}-analyst-${versions.analyst}`;
 writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(report, null, 2));
 // The transcripts are synthetic, from scripted personas, so they can be kept with the report.
 writeFileSync(path.join(dir, `${name}.transcripts.json`), JSON.stringify(personas.map((p) => ({ persona: p.persona, transcript: p.transcript })), null, 2));
-console.log(`\nRubric ${(rubricRate * 100).toFixed(1)}% (pass mark ${PASS_RUBRIC * 100}%) · Themes ${(themes.agreement * 100).toFixed(1)}% (pass mark ${PASS_THEMES * 100}%)`);
+console.log(`\nRubric ${(rubricRate * 100).toFixed(1)}% (pass mark ${PASS_RUBRIC * 100}%) · Themes ${(themes.agreement * 100).toFixed(1)}% (pass mark ${PASS_THEMES * 100}%) · Librarian ${(librarian.pass_rate * 100).toFixed(1)}% (pass mark ${PASS_LIBRARIAN * 100}%)`);
 console.log(`Report: evals/reports/${name}.json`);
-process.exit(stub || (report.rubric.passed && report.themes.passed) ? 0 : 1);
+process.exit(stub || (report.rubric.passed && report.themes.passed && report.librarian.passed) ? 0 : 1);

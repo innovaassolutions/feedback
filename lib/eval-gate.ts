@@ -1,7 +1,8 @@
 import { parseAgentFile } from "@/lib/server/ai/agent-file";
 
 // The merge gate for agent instructions: a changed AGENT.md must raise its version, and there
-// must be a real-model eval report for the new version that meets both pass marks.
+// must be a real-model eval report for the new version that meets the pass marks (and, for the
+// Librarian, its own set's).
 
 export type GateAgent = { folder: string; current: string; base: string | null };
 export type GateReport = {
@@ -9,6 +10,7 @@ export type GateReport = {
   versions?: Record<string, string>;
   rubric?: { passed?: boolean };
   themes?: { passed?: boolean };
+  librarian?: { passed?: boolean };
 };
 
 export function gate(agents: GateAgent[], reports: GateReport[]): { ok: boolean; problems: string[]; checked: string[] } {
@@ -26,7 +28,13 @@ export function gate(agents: GateAgent[], reports: GateReport[]): { ok: boolean;
       }
     }
     const passing = reports.some(
-      (r) => r.valid_for_gate === true && r.versions?.[a.folder] === current.version && r.rubric?.passed === true && r.themes?.passed === true,
+      (r) =>
+        r.valid_for_gate === true &&
+        r.versions?.[a.folder] === current.version &&
+        r.rubric?.passed === true &&
+        r.themes?.passed === true &&
+        // The Librarian's own set must pass for a change to the Librarian.
+        (a.folder !== "librarian" || r.librarian?.passed === true),
     );
     if (!passing) {
       problems.push(`agents/${a.folder}/AGENT.md is at ${current.version} but evals/reports/ has no passing real-model report for that version. Run npm run evals and commit the report.`);

@@ -43,7 +43,8 @@ export async function extractText(kind: DocumentKind, bytes: Uint8Array): Promis
       const mammoth = (await import("mammoth")).default;
       const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
       text = result.value;
-    } else if (kind === "vtt") {
+    } else if (kind === "vtt" || kind === "srt") {
+      // SRT cues are VTT cues without the header: numbers and timings are dropped the same way.
       text = vttToText(new TextDecoder().decode(bytes));
     } else {
       text = new TextDecoder().decode(bytes).replace(/^﻿/, "");

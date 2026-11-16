@@ -4,7 +4,7 @@
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
-export type DocumentKind = "pdf" | "docx" | "markdown" | "text" | "vtt";
+export type DocumentKind = "pdf" | "docx" | "markdown" | "text" | "vtt" | "srt";
 
 const DOCUMENT_EXTENSIONS: Record<string, DocumentKind> = {
   pdf: "pdf",
@@ -13,6 +13,7 @@ const DOCUMENT_EXTENSIONS: Record<string, DocumentKind> = {
   markdown: "markdown",
   txt: "text",
   vtt: "vtt",
+  srt: "srt",
 };
 
 export const DOCUMENT_MIME: Record<DocumentKind, string> = {
@@ -21,9 +22,10 @@ export const DOCUMENT_MIME: Record<DocumentKind, string> = {
   markdown: "text/markdown",
   text: "text/plain",
   vtt: "text/vtt",
+  srt: "application/x-subrip",
 };
 
-export const DOCUMENT_ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.vtt";
+export const DOCUMENT_ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.vtt,.srt";
 
 function startsWith(bytes: Uint8Array, prefix: number[]): boolean {
   return prefix.every((b, i) => bytes[i] === b);
@@ -55,6 +57,11 @@ export function detectDocumentKind(name: string, bytes: Uint8Array): DocumentKin
     const head = new TextDecoder().decode(bytes.slice(0, 16)).replace(/^﻿/, "");
     return head.startsWith("WEBVTT") ? kind : null;
   }
+  if (kind === "srt") {
+    // A subtitle file: numbered cues with "00:00:01,000 --> 00:00:04,000" timings.
+    const head = new TextDecoder().decode(bytes.slice(0, 2048));
+    return /\d{1,2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2}[,.]\d{3}/.test(head) ? kind : null;
+  }
   return kind;
 }
 
@@ -69,6 +76,15 @@ export function detectLogoKind(name: string, bytes: Uint8Array): LogoKind | null
     return /<svg[\s>]/i.test(text) ? "svg" : null;
   }
   return null;
+}
+
+/**
+ * Where a session document is stored: the organization, course and session folders (the storage
+ * rules check the course folder), then the document's own folder. The browser and the server
+ * build the same path, so the server never takes a path from the browser.
+ */
+export function documentStoragePath(ids: { organizationId: string; courseId: string; sessionId: string }, documentId: string, fileName: string): string {
+  return `${ids.organizationId}/${ids.courseId}/${ids.sessionId}/${documentId}/${safeFileName(fileName)}`;
 }
 
 export function safeFileName(name: string): string {

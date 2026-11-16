@@ -60,7 +60,7 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
         </Card>
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Documents</h2>
-          <DocumentsPanel sessionId={session.id} documents={documents ?? []} waitingForBrief={waitingForBrief(documents ?? [], session.brief_draft_at)} />
+          <DocumentsPanel organizationId={ctx.course.organization_id} courseId={ctx.course.id} sessionId={session.id} documents={documents ?? []} waitingForBrief={waitingForBrief(documents ?? [], session.brief_draft_at)} />
         </Card>
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Session brief</h2>

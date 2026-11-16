@@ -2,7 +2,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
-import { DOCUMENT_ACCEPT } from "@/lib/files";
+import { browserClient } from "@/lib/supabase/browser";
+import { DOCUMENT_ACCEPT, MAX_DOCUMENT_BYTES, documentStoragePath } from "@/lib/files";
 import { Badge, Button, Field, Notice, inputClass } from "@/components/ui";
 
 export type AdminDocument = {
@@ -18,7 +19,19 @@ export type AdminDocument = {
 const STATUS_LABEL = { processing: "Reading…", ready: "Ready", failed: "Couldn't read" } as const;
 const AUDIENCE_LABEL = { learners: "Learners and agents", agents_only: "Agents only" } as const;
 
-export function DocumentsPanel({ sessionId, documents, waitingForBrief = false }: { sessionId: string; documents: AdminDocument[]; waitingForBrief?: boolean }) {
+export function DocumentsPanel({
+  organizationId,
+  courseId,
+  sessionId,
+  documents,
+  waitingForBrief = false,
+}: {
+  organizationId: string;
+  courseId: string;
+  sessionId: string;
+  documents: AdminDocument[];
+  waitingForBrief?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,12 +44,27 @@ export function DocumentsPanel({ sessionId, documents, waitingForBrief = false }
     return () => clearInterval(t);
   }, [processing, router]);
 
+  // The file goes straight to storage from the browser, so large files don't pass through the
+  // app's request limit; the app then checks the stored file and records it.
   async function upload(form: FormData) {
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size === 0) return setError("Choose a file to upload.");
+    if (file.size > MAX_DOCUMENT_BYTES) return setError("Files can be up to 25 MB.");
     setBusy(true);
     setError(null);
-    const file = form.get("file");
-    if (file instanceof File && !String(form.get("title") ?? "").trim()) form.set("title", file.name.replace(/\.[^.]+$/, ""));
-    const res = await api("POST", `/api/sessions/${sessionId}/documents`, form);
+    const documentId = crypto.randomUUID();
+    const path = documentStoragePath({ organizationId, courseId, sessionId }, documentId, file.name);
+    const stored = await browserClient().storage.from("documents").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+    if (stored.error) {
+      setBusy(false);
+      return setError("The file couldn't be uploaded. Check your connection and try again.");
+    }
+    const res = await api("POST", `/api/sessions/${sessionId}/documents/uploaded`, {
+      document_id: documentId,
+      file_name: file.name,
+      title: String(form.get("title") ?? "").trim() || file.name.replace(/\.[^.]+$/, ""),
+      audience: String(form.get("audience") ?? "agents_only"),
+    });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     (document.getElementById("upload-form") as HTMLFormElement | null)?.reset();
@@ -70,7 +98,7 @@ export function DocumentsPanel({ sessionId, documents, waitingForBrief = false }
         {documents.length === 0 ? <li className="py-3 text-muted">No documents yet.</li> : null}
       </ul>
       <form id="upload-form" action={upload} className="grid gap-3 sm:grid-cols-3">
-        <Field label="File" hint="PDF, Word, Markdown, text or VTT, up to 25 MB">
+        <Field label="File" hint="PDF, Word, Markdown, text, or a VTT or SRT transcript, up to 25 MB">
           <input name="file" type="file" required accept={DOCUMENT_ACCEPT} className={inputClass} />
         </Field>
         <Field label="Title">
