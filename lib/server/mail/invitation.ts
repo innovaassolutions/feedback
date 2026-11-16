@@ -1,6 +1,6 @@
 import type { AdminClient } from "@/lib/server/supabase-admin";
 import type { EmailBrand } from "./brand";
-import type { EmailContent } from "./layout";
+import type { EmailBlock, EmailContent } from "./layout";
 
 // The first email a person gets is an invitation, not a bare sign-in link: it says who invited them,
 // to what, what they can do there, and how signing in works.
@@ -10,7 +10,11 @@ export type Invitation = { subject: string; content: EmailContent };
 type Who = { id: string; platformAdmin: boolean };
 
 const howToSignIn = (signInUrl: string) =>
-  `There's no password. Whenever you want to sign in, enter this email address at ${signInUrl} and we'll email you a link like this one.`;
+  `There's no password. Whenever you want to sign in, enter this email address at ${signInUrl} and we'll email you a link and a code like these.`;
+
+/** The 6-digit code as a block, for someone who reads this email on another device. */
+export const codeLines = (code: string | null): EmailBlock[] =>
+  code ? [{ code: `${code.slice(0, 3)} ${code.slice(3)}`, label: "Reading this on another device? On the sign-in page there, enter this code:" }] : [];
 
 /** What the person was invited as, from the page their link opens and the roles they hold there. */
 export async function invitationFor(
@@ -20,12 +24,13 @@ export async function invitationFor(
   nextPath: string,
   link: string,
   appUrl: string,
+  code: string | null = null,
 ): Promise<Invitation> {
   const [pathOrg, pathCourse] = nextPath.split(/[?#]/)[0].split("/").filter(Boolean);
   const orgSlug = brand.slug ?? "";
   // A course only counts when the link opens one of this organization's courses.
   const courseSlug = pathOrg === orgSlug ? pathCourse : undefined;
-  const note = "This link works once and expires in an hour.";
+  const note = "This link and code work once and expire in 24 hours.";
 
   if (!brand.organization) {
     const signInUrl = `${appUrl}/sign-in`;
@@ -35,7 +40,7 @@ export async function invitationFor(
           content: {
             preview: "You can create organizations and manage their courses and people.",
             heading: "Welcome to the Course Feedback Platform",
-            body: ["You've been made a platform admin. You can create organizations and manage their courses and people.", howToSignIn(signInUrl)],
+            body: ["You've been made a platform admin. You can create organizations and manage their courses and people.", howToSignIn(signInUrl), ...codeLines(code)],
             button: { label: "Sign in", url: link },
             note: `${note} If it has expired, get a new one at ${signInUrl}.`,
           },
@@ -45,7 +50,7 @@ export async function invitationFor(
           content: {
             preview: "Sign in to see your courses.",
             heading: "You're invited",
-            body: ["You've been given access to the Course Feedback Platform.", howToSignIn(signInUrl)],
+            body: ["You've been given access to the Course Feedback Platform.", howToSignIn(signInUrl), ...codeLines(code)],
             button: { label: "Sign in", url: link },
             note: `${note} If it has expired, get a new one at ${signInUrl}.`,
           },
@@ -88,7 +93,7 @@ export async function invitationFor(
     content: {
       preview: lines[0],
       heading,
-      body: [...lines, howToSignIn(signInUrl)],
+      body: [...lines, howToSignIn(signInUrl), ...codeLines(code)],
       button: { label: "Sign in", url: link },
       note: `${note} If it has expired, get a new one at ${signInUrl}.`,
     },

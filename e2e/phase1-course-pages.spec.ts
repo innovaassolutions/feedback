@@ -12,7 +12,7 @@ test("a learner signs in by magic link and lands on the course page", async ({ p
   const sentAt = new Date();
   await page.getByLabel("Email address").fill(SEED_USERS.aisha.email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByText("a sign-in link is on its way")).toBeVisible();
+  await expect(page.getByText("a sign-in email is on its way")).toBeVisible();
 
   const link = await waitForSignInLink(SEED_USERS.aisha.email, sentAt);
   // Auth hands the email to the app, which sends it in Streamspace's branding with its logo as a PNG.

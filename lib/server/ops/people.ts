@@ -128,3 +128,35 @@ export async function listPlatformAdmins(ctx: Ctx) {
   if (error) throw new Error(`platform admins: ${error.message}`);
   return data ?? [];
 }
+
+const TOO_SOON = "An email went to this address less than a minute ago. Wait a minute, then send it again.";
+
+/** Emails a learner again: their invitation if they've never signed in, otherwise a sign-in email. */
+export async function resendInvitation(ctx: Ctx, input: OperationInput<"resend_invitation">) {
+  requireUser(ctx);
+  const { data: row } = await ctx.db
+    .from("enrollments")
+    .select("id, email, course_id, courses!inner(slug, organizations!inner(slug))")
+    .eq("id", input.enrollment_id)
+    .maybeSingle();
+  if (!row) throw notFound("Learner not found");
+  const { data: manages } = await ctx.db.rpc("can_manage_course", { course: row.course_id });
+  if (manages !== true) throw forbidden("Only the course's instructors and admins can do this");
+  if (!(await sendSignInLink(ctx, row.email, `/${row.courses.organizations.slug}/${row.courses.slug}`))) throw conflict(TOO_SOON);
+  return { sent: true };
+}
+
+/** Emails an admin, instructor or sponsor again, opening their course or organization. */
+export async function resendStaffInvitation(ctx: Ctx, input: OperationInput<"resend_staff_invitation">) {
+  requireUser(ctx);
+  const { data: m } = await ctx.db
+    .from("memberships")
+    .select("id, email, organization_id, course_id, organizations!inner(slug), courses(slug)")
+    .eq("id", input.membership_id)
+    .maybeSingle();
+  if (!m) throw notFound("That person wasn't found");
+  await requireOrgAdmin(ctx, m.organization_id);
+  const path = m.courses ? `/${m.organizations.slug}/${m.courses.slug}` : `/${m.organizations.slug}`;
+  if (!(await sendSignInLink(ctx, m.email, path))) throw conflict(TOO_SOON);
+  return { sent: true };
+}

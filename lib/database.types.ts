@@ -1527,6 +1527,13 @@ export type Database = {
       }
       quality_figures: { Args: never; Returns: Json }
       reads_course_detail: { Args: { course: string }; Returns: boolean }
+      roster_sign_in_status: {
+        Args: { p_course: string }
+        Returns: {
+          enrollment_id: string
+          signed_in: boolean
+        }[]
+      }
       session_has_activity: { Args: { p_session: string }; Returns: boolean }
       session_response_counts: {
         Args: { p_course: string }
@@ -1544,6 +1551,13 @@ export type Database = {
         Returns: Json
       }
       seven_day_quality: { Args: { p_now: string }; Returns: Json }
+      staff_sign_in_status: {
+        Args: { p_organization: string }
+        Returns: {
+          membership_id: string
+          signed_in: boolean
+        }[]
+      }
       submitted_count: {
         Args: {
           p_kind: Database["public"]["Enums"]["interview_kind"]

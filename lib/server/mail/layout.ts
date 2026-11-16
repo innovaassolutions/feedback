@@ -7,7 +7,7 @@ import type { EmailBrand } from "./brand";
 // in the primary color. Mail apps don't support CSS variables, so the theme's values are written
 // inline, and a dark-mode block repeats them from the theme's dark tokens for apps that follow it.
 
-export type EmailBlock = string | { quote: string };
+export type EmailBlock = string | { quote: string } | { code: string; label: string };
 
 export type EmailContent = {
   /** Shown by mail apps next to the subject. */
@@ -51,7 +51,13 @@ export function renderEmail(brand: EmailBrand, content: EmailContent): { html: s
     .map((block) =>
       typeof block === "string"
         ? para(block)
-        : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>` +
+        : "code" in block
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>` +
+            `<td class="e-quote" style="background-color:${light.soft};border-radius:${Math.min(r, 8)}px;padding:12px 16px;">` +
+            `<p class="e-muted" style="margin:0 0 4px;font-family:${body};font-size:13px;line-height:1.5;color:${light.muted};">${esc(block.label)}</p>` +
+            `<p class="e-text" style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:26px;font-weight:600;letter-spacing:6px;color:${light.text};">${esc(block.code)}</p>` +
+            `</td></tr></table>`
+          : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>` +
           `<td class="e-quote" style="background-color:${light.soft};border-left:4px solid ${light.primary};border-radius:${Math.min(r, 8)}px;padding:12px 16px;">` +
           `<p class="e-text" style="margin:0;font-family:${body};font-size:16px;line-height:1.5;color:${light.text};">${esc(block.quote).replace(/\n/g, "<br>")}</p>` +
           `</td></tr></table>`,
@@ -120,7 +126,7 @@ ${blocks}${button}${note}
 </html>`;
 
   const text = [
-    ...content.body.map((block) => (typeof block === "string" ? block : block.quote)),
+    ...content.body.map((block) => (typeof block === "string" ? block : "code" in block ? `${block.label} ${block.code}` : block.quote)),
     ...(content.button ? [content.button.url] : []),
     ...(content.note ? [content.note] : []),
     `— ${brand.name}`,

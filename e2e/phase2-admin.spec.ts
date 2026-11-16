@@ -18,7 +18,7 @@ test("the session page shows a join link and QR code that lead a signed-out lear
   const sentAt = new Date();
   await learner.getByLabel("Email address").fill(SEED_USERS.elena.email);
   await learner.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(learner.getByText("a sign-in link is on its way")).toBeVisible();
+  await expect(learner.getByText("a sign-in email is on its way")).toBeVisible();
   const link = await waitForSignInLink(SEED_USERS.elena.email, sentAt);
   await learner.goto(link);
   await expect(learner).toHaveURL(/\/streamspace\/ime-engineering\/sessions\/1\/interview$/);

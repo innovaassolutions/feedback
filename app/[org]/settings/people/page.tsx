@@ -3,9 +3,9 @@ import { requireBranding } from "@/lib/branding";
 import { createUserClient } from "@/lib/supabase/server";
 import { Card, PageTitle } from "@/components/ui";
 import { AddStaffForm, RemoveButton } from "@/components/admin/people-forms";
-import { EditForm } from "@/components/admin/edit-forms";
+import { ActionButton, EditForm } from "@/components/admin/edit-forms";
 
-type Person = { id: string; user_id: string; display_name: string; email: string };
+type Person = { id: string; user_id: string; display_name: string; email: string; signed_in?: boolean };
 
 function PeopleList({ people, role, selfId, canRemoveSelf, empty }: { people: Person[]; role: string; selfId: string; canRemoveSelf: boolean; empty: string }) {
   if (!people.length) return <p className="py-2 text-sm text-muted">{empty}</p>;
@@ -15,8 +15,10 @@ function PeopleList({ people, role, selfId, canRemoveSelf, empty }: { people: Pe
         <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
           <span>
             {p.display_name} <span className="text-sm text-muted">{p.email}</span>
+            <span className={p.signed_in ? "block text-sm text-success" : "block text-sm text-muted"}>{p.signed_in ? "✓ Signed in" : "Not signed in yet"}</span>
           </span>
           <span className="flex flex-wrap items-start gap-3">
+            <ActionButton path={`/api/staff/${p.id}/invite`} label={p.signed_in ? "Send a sign-in email" : "Resend invitation"} done="Sent" />
             <EditForm toggle="Edit name" path={`/api/staff/${p.id}`} fields={[{ name: "display_name", label: "Name", value: p.display_name }]} />
             {p.user_id === selfId && !canRemoveSelf ? (
               <span className="text-sm text-muted">You</span>
@@ -40,7 +42,9 @@ export default async function PeoplePage({ params }: PageProps<"/[org]/settings/
     db.from("memberships").select("id, user_id, role, course_id, display_name, email").eq("organization_id", branding.id).order("display_name"),
     db.from("courses").select("id, title").eq("organization_id", branding.id).order("title"),
   ]);
-  const all = memberships ?? [];
+  const { data: status } = await db.rpc("staff_sign_in_status", { p_organization: branding.id });
+  const signedIn = new Map((status ?? []).map((s) => [s.membership_id, s.signed_in]));
+  const all = (memberships ?? []).map((m) => ({ ...m, signed_in: signedIn.get(m.id) ?? false }));
   const platformAdmin = isPlatformAdmin(user);
   return (
     <>

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { addPlatformAdmin, addStaff, listPlatformAdmins, removePlatformAdmin, removeStaff } from "@/lib/server/ops/people";
+import { addPlatformAdmin, addStaff, listPlatformAdmins, removePlatformAdmin, removeStaff, resendInvitation, resendStaffInvitation } from "@/lib/server/ops/people";
 import { parseSlug, suggestSlug } from "@/lib/slug";
 import { admin, seeded, sql, userId } from "./support/db";
 import { ctxAs, statusOf, type TestCtx } from "./support/ctx";
@@ -83,6 +83,39 @@ describe("an organization's people", () => {
     expect(await sql()`select id from public.memberships where id = ${added.membership_id}`).toHaveLength(0);
     const [own] = await sql()`select id from public.memberships where user_id = ${await userId("dana")} and role = 'org_admin'`;
     expect(await statusOf(removeStaff(dana, { membership_id: own.id as string }))).toBe(409);
+  });
+});
+
+describe("resending invitations", () => {
+  const stamp = Date.now();
+  let ids: Awaited<ReturnType<typeof seeded>>;
+  beforeAll(async () => {
+    ids = await seeded();
+  });
+
+  it("an instructor resends a learner's invitation, and sees who hasn't signed in", async () => {
+    const email = `resend.${stamp}@learner.example`;
+    const { data: user } = await admin().auth.admin.createUser({ email, email_confirm: true });
+    const [row] = await sql()`insert into public.enrollments (organization_id, course_id, user_id, display_name, email) values (${ids.streamspace}, ${ids.ime}, ${user.user!.id}, 'Resend Learner', ${email}) returning id`;
+    const marcus = await ctxAs("marcus");
+    const since = new Date();
+    expect(await resendInvitation(marcus, { enrollment_id: row.id as string })).toEqual({ sent: true });
+    expect((await inbox(email, since)).map((m) => m.Subject)).toContain("You're invited to give feedback on Streamspace platform training: IME Engineering");
+    const { data: status } = await marcus.db.rpc("roster_sign_in_status", { p_course: ids.ime });
+    expect(status?.find((s) => s.enrollment_id === row.id)).toEqual({ enrollment_id: row.id, signed_in: false });
+
+    // A learner, and another organization's admin, can't.
+    expect([403, 404]).toContain(await statusOf(resendInvitation(await ctxAs("ben"), { enrollment_id: row.id as string })));
+    expect(await statusOf(resendInvitation(await ctxAs("owen"), { enrollment_id: row.id as string }))).toBe(404);
+    const { data: hidden } = await (await ctxAs("ben")).db.rpc("roster_sign_in_status", { p_course: ids.ime });
+    expect(hidden).toEqual([]);
+  });
+
+  it("an organization admin resends to an instructor; an instructor can't", async () => {
+    const [m] = await sql()`select id from public.memberships where user_id = ${await userId("marcus")} and role = 'instructor' limit 1`;
+    await new Promise((r) => setTimeout(r, 1100)); // one email per address a second on the test stack
+    expect(await resendStaffInvitation(await ctxAs("dana"), { membership_id: m.id as string })).toEqual({ sent: true });
+    expect([403, 404]).toContain(await statusOf(resendStaffInvitation(await ctxAs("marcus"), { membership_id: m.id as string })));
   });
 });
 

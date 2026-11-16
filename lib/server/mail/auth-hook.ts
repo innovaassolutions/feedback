@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Mailer } from "@/lib/server/email";
 import type { AdminClient } from "@/lib/server/supabase-admin";
 import { brandForSignIn } from "./brand";
-import { invitationFor } from "./invitation";
+import { codeLines, invitationFor } from "./invitation";
 import { brandedEmail } from "./layout";
 
 // Supabase Auth's send-email hook. Auth still creates and checks every sign-in link and applies its
@@ -35,6 +35,8 @@ const payloadSchema = z.object({
   }),
   email_data: z.object({
     token_hash: z.string().min(1),
+    // The same one-time pass as a 6-digit code, for signing in on another device than the email's.
+    token: z.string().nullish(),
     redirect_to: z.string().nullish(),
     email_action_type: z.string(),
   }),
@@ -80,6 +82,7 @@ export async function sendAuthEmail(input: unknown, deps: HookDeps): Promise<voi
   if (!type) throw new HookError(400, `This platform doesn't send ${data.email_action_type} emails.`);
 
   const link = signInLink(data.redirect_to, deps.appUrl, type, data.token_hash);
+  const code = data.token && /^\d{6}$/.test(data.token) ? data.token : null;
   const { brand, otherOrganization } = await brandForSignIn(
     deps.admin,
     { id: user.id, platformAdmin: user.app_metadata?.platform_admin === true },
@@ -93,15 +96,18 @@ export async function sendAuthEmail(input: unknown, deps: HookDeps): Promise<voi
   const { data: account } = await deps.admin.auth.admin.getUserById(user.id);
   if (!account?.user?.last_sign_in_at) {
     const who = { id: user.id, platformAdmin: user.app_metadata?.platform_admin === true };
-    const invitation = await invitationFor(deps.admin, who, brand, link.searchParams.get("next") ?? "/", link.toString(), deps.appUrl);
+    const invitation = await invitationFor(deps.admin, who, brand, link.searchParams.get("next") ?? "/", link.toString(), deps.appUrl, code);
     await deps.mailer.send(brandedEmail(user.email, invitation.subject, brand, invitation.content));
     return;
   }
   await deps.mailer.send(
     brandedEmail(user.email, brand.organization ? `Your sign-in link for ${brand.name}` : "Your sign-in link", brand, {
-      preview: "It works once and expires in an hour.",
+      preview: "It works once and expires in 24 hours.",
       heading: "Sign in",
-      body: [brand.organization ? `Use this button to sign in to ${brand.name}. It works once and expires in an hour.` : "Use this button to sign in. It works once and expires in an hour."],
+      body: [
+        brand.organization ? `Use this button to sign in to ${brand.name}. It works once and expires in 24 hours.` : "Use this button to sign in. It works once and expires in 24 hours.",
+        ...codeLines(code),
+      ],
       button: { label: "Sign in", url: link.toString() },
       note: "If you didn't ask for this, you can ignore this email.",
     }),

@@ -1,5 +1,5 @@
 <h2>Sign in</h2>
-<p>Use this link to sign in. It works once and expires in an hour.</p>
+<p>Use this link to sign in. It works once and expires in 24 hours.</p>
 {{/* The app sends the confirm URL on the address the person is using (see signInRedirect). If Auth didn't accept it, RedirectTo is the site URL. */}}
 <p><a href="{{ if eq .RedirectTo .SiteURL }}{{ .SiteURL }}/auth/confirm?type=email&token_hash={{ .TokenHash }}{{ else }}{{ .RedirectTo }}&type=email&token_hash={{ .TokenHash }}{{ end }}">Sign in</a></p>
 <p>If you didn't ask for this, you can ignore this email.</p>

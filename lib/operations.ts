@@ -130,6 +130,8 @@ export const operations = {
   update_staff: op("POST", "/api/staff/{membership_id}", "Corrects the name of an organization admin, instructor or sponsor", z.object({ membership_id: id, display_name: text(120) })),
   remove_documentation_source: op("DELETE", "/api/documentation/{source_id}", "Removes a documentation site and every page read from it", z.object({ source_id: id })),
   refresh_documentation_source: op("POST", "/api/documentation/{source_id}/refresh", "Reads a documentation site again now", z.object({ source_id: id })),
+  resend_invitation: op("POST", "/api/enrollments/{enrollment_id}/invite", "Emails a learner their invitation again, or a sign-in email once they've signed in", z.object({ enrollment_id: id })),
+  resend_staff_invitation: op("POST", "/api/staff/{membership_id}/invite", "Emails an admin, instructor or sponsor their invitation again, or a sign-in email", z.object({ membership_id: id })),
   start_interview: op(
     "POST",
     "/api/sessions/{session_id}/interviews",

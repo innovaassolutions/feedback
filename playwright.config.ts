@@ -34,11 +34,21 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: /realtime\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         // A fake microphone, and permission prompts answered automatically.
         launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
       },
+    },
+    // Timing checks (a live update within two seconds) run on their own after everything else, so
+    // a machine busy with three parallel workers doesn't decide them.
+    {
+      name: "realtime",
+      testMatch: /realtime\.spec\.ts/,
+      dependencies: ["chromium"],
+      fullyParallel: false,
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   webServer: {

@@ -160,6 +160,17 @@ describe("sign-in emails", () => {
     expect(email.text).toContain(link.toString());
   });
 
+  it("carry the 6-digit code for signing in on another device", async () => {
+    const body = payload(aisha, "/streamspace/ime-engineering");
+    const { outbox } = await send(hookRequest({ ...body, email_data: { ...body.email_data, token: "482913" } }));
+    expect(outbox[0].html).toContain("482 913");
+    expect(outbox[0].text).toContain("enter this code: 482 913");
+    // No code in the payload, no code block.
+    const without = payload(aisha, "/streamspace/ime-engineering");
+    const plain = await send(hookRequest({ ...without, email_data: { ...without.email_data, token: null } }));
+    expect(plain.outbox[0].text).not.toContain("enter this code");
+  });
+
   it("never show or link to an organization the person isn't in", async () => {
     const { outbox } = await send(hookRequest(payload(aisha, "/northwind/customer-onboarding")));
     const [email] = outbox;

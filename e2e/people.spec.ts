@@ -55,4 +55,10 @@ test("an instructor pastes a whole class list, longer than one address field, in
   await expect(page.getByTestId("invite-report")).toContainText("Enrolled 14 learners", { timeout: 60_000 });
   await expect(page.getByTestId("roster")).toContainText("Lovelace, Ada");
   await expect(page.getByTestId("roster")).toContainText("Grace Hopper");
+  // Each shows whether they've signed in, and the invitation can be sent again.
+  const grace = page.getByTestId("roster").getByRole("listitem").filter({ hasText: "Grace Hopper" });
+  await expect(grace.getByTestId("sign-in-status")).toHaveText("Not signed in yet");
+  await page.waitForTimeout(1200); // one email per address a second on the test stack
+  await grace.getByRole("button", { name: "Resend invitation" }).click();
+  await expect(grace.getByRole("button", { name: "Sent" })).toBeVisible();
 });
