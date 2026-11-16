@@ -43,6 +43,9 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
   const joinUrl = `${await requestOrigin()}/${org}/${course}/sessions/${session.number}/interview`;
   const brief = (session.brief_approved_at ? session.brief : session.brief_draft) as Brief | null;
 
+  const { data: sessionQuestions } = await db.from("questions").select("state").eq("session_id", session.id);
+  const questionCount = (sessionQuestions ?? []).length;
+  const waitingCount = (sessionQuestions ?? []).filter((q) => q.state === "open" || q.state === "needs_instructor").length;
   // The sessions either side, to move through the course's setup in order.
   const { data: siblings } = await db.from("sessions").select("number, title").eq("course_id", ctx.course.id).order("number");
   const at = (siblings ?? []).findIndex((x) => x.number === session.number);
@@ -121,7 +124,9 @@ export default async function AdminSessionPage({ params }: PageProps<"/[org]/[co
           </p>
           <JoinLink url={joinUrl} />
           <p className="mt-3 text-sm">
-            <Link href={`/${org}/${course}/sessions/${session.number}`}>See the session as learners do, with its Q&amp;A board</Link>
+            <Link href={`/${org}/${course}/sessions/${session.number}#questions`}>
+              Open its Q&amp;A board{questionCount ? ` (${questionCount} ${questionCount === 1 ? "question" : "questions"}${waitingCount ? `, ${waitingCount} waiting for an answer` : ""})` : ""}
+            </Link>
           </p>
         </Card>
       </div>

@@ -28,6 +28,8 @@ export function Citations({ answer }: { answer: Answer }) {
 
 function InstructorTools({ question, answer, onDone }: { question: QuestionView; answer: Answer | undefined; onDone: () => void }) {
   const [mode, setMode] = useState<"idle" | "edit" | "write">("idle");
+  // Deleting asks once more, so a stray click doesn't remove a learner's question or an answer.
+  const [confirming, setConfirming] = useState<"question" | "answer" | null>(null);
   const [text, setText] = useState(answer?.text ?? "");
   const [error, setError] = useState<string | null>(null);
   async function call(method: "POST" | "DELETE", path: string, body?: unknown) {
@@ -35,6 +37,7 @@ function InstructorTools({ question, answer, onDone }: { question: QuestionView;
     const res = await api(method, path, body);
     if (!res.ok) return setError(res.error);
     setMode("idle");
+    setConfirming(null);
     onDone();
   }
   return (
@@ -45,9 +48,21 @@ function InstructorTools({ question, answer, onDone }: { question: QuestionView;
         ) : null}
         {answer ? <Button variant="secondary" onClick={() => { setText(answer.text); setMode("edit"); }}>Edit answer</Button> : null}
         <Button variant="secondary" onClick={() => { setText(""); setMode("write"); }}>{answer ? "Replace with my answer" : "Answer"}</Button>
-        {answer && answer.kind === "instructor" ? <Button variant="danger" onClick={() => call("DELETE", `/api/answers/${answer.id}`)}>Delete answer</Button> : null}
-        <Button variant="danger" onClick={() => call("DELETE", `/api/questions/${question.id}`)}>Delete question</Button>
+        {answer && answer.kind === "instructor" ? <Button variant="danger" onClick={() => setConfirming("answer")}>Delete answer</Button> : null}
+        <Button variant="danger" onClick={() => setConfirming("question")}>Delete question</Button>
       </div>
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Confirm delete">
+          <span>{confirming === "question" ? "Delete this question and its answers for everyone?" : "Delete your answer?"}</span>
+          <Button
+            variant="danger"
+            onClick={() => (confirming === "question" ? call("DELETE", `/api/questions/${question.id}`) : answer ? call("DELETE", `/api/answers/${answer.id}`) : undefined)}
+          >
+            Yes, delete
+          </Button>
+          <Button variant="ghost" onClick={() => setConfirming(null)}>Cancel</Button>
+        </div>
+      ) : null}
       {mode !== "idle" ? (
         <form
           className="space-y-2"
@@ -121,7 +136,7 @@ export function QaBoard({ sessionId, canAsk, isInstructor, initial }: { sessionI
   }
 
   return (
-    <div className="space-y-4" data-testid="qa-board" data-live={live}>
+    <div id="questions" className="scroll-mt-4 space-y-4" data-testid="qa-board" data-live={live}>
       {canAsk ? (
         <form
           className="space-y-2"

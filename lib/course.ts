@@ -23,6 +23,7 @@ export type CourseContext = {
     readTranscripts: boolean;
     /** Answer and verify questions, record actions. */
     instruct: boolean;
+    answerQuestions: boolean;
     /** Give feedback, ask and vote. */
     learn: boolean;
   };
@@ -81,6 +82,8 @@ export const loadCourse = cache(async (orgSlug: string, courseSlug: string): Pro
       readResults: roles.has("instructor") || roles.has("sponsor") || roles.has("org_admin") || roles.has("platform_admin"),
       readTranscripts: roles.has("instructor") || roles.has("org_admin") || roles.has("platform_admin"),
       instruct: roles.has("instructor"),
+      // Answering, verifying and removing on the Q&A board: instructors, and admins as they do.
+      answerQuestions: roles.has("instructor") || roles.has("org_admin") || roles.has("platform_admin"),
       learn: roles.has("learner"),
     },
   };

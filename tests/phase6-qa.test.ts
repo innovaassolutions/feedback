@@ -6,7 +6,7 @@ import { addDocumentationSource } from "@/lib/server/ops/documentation";
 import { addDocument } from "@/lib/server/ops/documents";
 import { overrideStubBrain } from "@/lib/server/ai/models";
 import { qaStats } from "@/lib/metrics";
-import { seeded, sql } from "./support/db";
+import { admin, seeded, sql } from "./support/db";
 import { ctxAs, statusOf, type TestCtx } from "./support/ctx";
 import { openSession } from "./support/interview";
 import { REBUILD_GUIDE_MD, fileOf } from "./support/fixtures";
@@ -221,6 +221,27 @@ describe("instructor answers", () => {
     await marcus.runJobs();
     // The only other answer that mentions the wifi is the AI answer to the later question, which isn't verified.
     expect((await stateOf(third.question.id)).state).toBe("needs_instructor");
+  });
+});
+
+describe("admins on the Q&A board", () => {
+  it("an organization admin who isn't an instructor answers a question sent to the instructor, and removes a duplicate", async () => {
+    const s = await openSession("Admin answers");
+    const email = `qa.admin.${Date.now()}@staff.example`;
+    const { data: user } = await admin().auth.admin.createUser({ email, email_confirm: true });
+    await sql()`insert into public.memberships (organization_id, user_id, role, course_id, display_name, email) values (${ids.streamspace}, ${user.user!.id}, 'org_admin', null, 'QA Admin', ${email})`;
+    const orgAdmin = await ctxAs({ email });
+    const [asked, duplicate] = await sql()`insert into public.questions (organization_id, course_id, session_id, text, state, origin)
+      values (${ids.streamspace}, ${ids.ime}, ${s.id}, 'Is there a recording of the session?', 'needs_instructor', 'interview'),
+             (${ids.streamspace}, ${ids.ime}, ${s.id}, 'Is there a recording of the session?', 'needs_instructor', 'interview') returning id`;
+    await answerQuestionOp(orgAdmin, { question_id: asked.id as string, text: "Yes: it's on the session page under Materials.", verifies_answer_id: null });
+    const [row] = await sql()`select state from public.questions where id = ${asked.id}`;
+    expect(row.state).toBe("answered");
+    await deleteQuestion(orgAdmin, duplicate.id as string);
+    expect(await sql()`select id from public.questions where id = ${duplicate.id}`).toHaveLength(0);
+    // A learner, and another organization's admin, can't.
+    expect([403, 404]).toContain(await statusOf(answerQuestionOp(await ctxAs("ben"), { question_id: asked.id as string, text: "Me too", verifies_answer_id: null })));
+    expect([403, 404]).toContain(await statusOf(deleteQuestion(await ctxAs("owen"), asked.id as string)));
   });
 });
 

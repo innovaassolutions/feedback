@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/server/ctx";
 import type { OperationInput } from "@/lib/operations";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/server/http";
 import { enqueue } from "@/lib/server/jobs/queue";
-import { isEnrolled, isInstructor, kickJobs, sessionForUser } from "./common";
+import { isEnrolled, kickJobs, readsCourseDetail, sessionForUser } from "./common";
 
 export type QuestionView = {
   id: string;
@@ -121,7 +121,7 @@ export async function answerQuestionOp(ctx: Ctx, input: OperationInput<"answer_q
   const user = requireUser(ctx);
   const { data: q } = await ctx.db.from("questions").select("id, organization_id, course_id, session_id, first_answered_at").eq("id", input.question_id).maybeSingle();
   if (!q) throw notFound("Question not found");
-  if (!(await isInstructor(ctx, q.course_id))) throw forbidden("Only the course's instructors can answer");
+  if (!(await readsCourseDetail(ctx, q.course_id))) throw forbidden("Only the course's instructors and admins can answer");
   const now = ctx.now().toISOString();
   let answerId: string;
   if (input.verifies_answer_id) {
@@ -167,7 +167,7 @@ export async function deleteAnswer(ctx: Ctx, answerId: string) {
   requireUser(ctx);
   const { data: a } = await ctx.db.from("answers").select("id, question_id, course_id").eq("id", answerId).maybeSingle();
   if (!a) throw notFound("Answer not found");
-  if (!(await isInstructor(ctx, a.course_id))) throw forbidden("Only the course's instructors can do this");
+  if (!(await readsCourseDetail(ctx, a.course_id))) throw forbidden("Only the course's instructors and admins can do this");
   await ctx.db.from("answers").delete().eq("id", a.id);
   const { count } = await ctx.db.from("answers").select("id", { count: "exact", head: true }).eq("question_id", a.question_id);
   if (!count) await ctx.db.from("questions").update({ state: "needs_instructor" }).eq("id", a.question_id);
@@ -178,7 +178,7 @@ export async function deleteQuestion(ctx: Ctx, questionId: string) {
   requireUser(ctx);
   const { data: q } = await ctx.db.from("questions").select("id, course_id").eq("id", questionId).maybeSingle();
   if (!q) throw notFound("Question not found");
-  if (!(await isInstructor(ctx, q.course_id))) throw forbidden("Only the course's instructors can do this");
+  if (!(await readsCourseDetail(ctx, q.course_id))) throw forbidden("Only the course's instructors and admins can do this");
   await ctx.db.from("questions").delete().eq("id", q.id);
   return { deleted: q.id };
 }

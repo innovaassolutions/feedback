@@ -28,7 +28,7 @@ export default async function CourseSetupPage({ params }: PageProps<"/[org]/[cou
   const ctx = await requireCourse(org, course);
   const db = await createUserClient();
   const orgAdmin = ctx.roles.has("org_admin") || ctx.roles.has("platform_admin");
-  const [{ data: sessions }, { data: documents }, { count: learners }, { data: staff }, { data: sources }] = await Promise.all([
+  const [{ data: sessions }, { data: documents }, { count: learners }, { data: staff }, { data: sources }, { data: questions }] = await Promise.all([
     db.from("sessions").select("id, number, title, date, state, brief_approved_at, brief_draft_at, closes_at").eq("course_id", ctx.course.id).order("number"),
     db.from("documents").select("session_id, status").eq("course_id", ctx.course.id),
     db.from("enrollments").select("id", { count: "exact", head: true }).eq("course_id", ctx.course.id),
@@ -36,6 +36,7 @@ export default async function CourseSetupPage({ params }: PageProps<"/[org]/[cou
     orgAdmin
       ? db.from("documentation_sources").select("id, url, status, page_count, error, last_read_at").eq("organization_id", ctx.org.id).order("created_at")
       : Promise.resolve({ data: null }),
+    db.from("questions").select("session_id, state").eq("course_id", ctx.course.id),
   ]);
   const list = sessions ?? [];
   const docs = documents ?? [];
@@ -78,6 +79,16 @@ export default async function CourseSetupPage({ params }: PageProps<"/[org]/[cou
                   </Link>
                   <p className="text-sm text-muted">{formatDate(s.date)}</p>
                   <StepLine steps={steps} />
+                  {(() => {
+                    const qs = (questions ?? []).filter((q) => q.session_id === s.id);
+                    if (!qs.length) return null;
+                    const waiting = qs.filter((q) => q.state === "open" || q.state === "needs_instructor").length;
+                    return (
+                      <Link href={`/${org}/${course}/sessions/${s.number}#questions`} className={waiting ? "mt-1 block text-sm font-medium" : "mt-1 block text-sm"} data-testid="session-questions">
+                        Q&amp;A: {plural(qs.length, "question")}{waiting ? `, ${waiting} waiting for an answer` : ", all answered"}
+                      </Link>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge tone={s.state === "open" ? "primary" : "neutral"}>{SESSION_STATE_LABEL[s.state]}</Badge>

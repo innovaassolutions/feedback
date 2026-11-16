@@ -100,7 +100,7 @@ export default async function SessionPage({ params }: PageProps<"/[org]/[course]
         {qaOpen ? (
           <Card>
             <h2 className="mb-3 text-lg font-semibold">Questions</h2>
-            <QaBoard sessionId={session.id} canAsk={ctx.can.learn} isInstructor={ctx.can.instruct} initial={questions} />
+            <QaBoard sessionId={session.id} canAsk={ctx.can.learn} isInstructor={ctx.can.answerQuestions} initial={questions} />
           </Card>
         ) : null}
         {ctx.can.manage ? (
