@@ -25,9 +25,17 @@ test("an organization admin renames a course and its session, then deletes them"
   // Rename the course.
   await page.getByRole("link", { name: "Rename or change settings" }).click();
   const details = page.getByTestId("course-details");
+  // The web address explains itself: a website is caught, and a change is warned about.
+  const address = details.getByLabel("Web address");
+  await address.fill("www.streamspace.ai");
+  await expect(details.getByTestId("address-check")).toContainText("That's a website address");
+  await address.fill(`foundation-${stamp}`);
+  await expect(details.getByTestId("address-change-warning")).toContainText("will stop working");
+  await expect(details.getByTestId("address-check")).toContainText(`/streamspace/foundation-${stamp}`);
   await details.getByLabel("Course title").fill(`Foundation programme ${stamp}`);
   await details.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByTestId("setup-course-title")).toHaveText(`Foundation programme ${stamp}`);
+  await expect(page).toHaveURL(new RegExp(`/streamspace/foundation-${stamp}/admin/details$`));
 
   // Rename the session.
   await page.getByRole("link", { name: "Sessions", exact: true }).click();

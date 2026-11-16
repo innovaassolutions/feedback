@@ -26,7 +26,7 @@ export default async function BrandPage({ params }: PageProps<"/[org]/settings/b
       <Card className="mb-6">
         <h2 className="mb-1 text-lg font-semibold">Name and web address</h2>
         <p className="mb-3 text-sm text-muted">
-          The web address is the organization&apos;s part of every link: {new URL(publicEnv.appUrl).host}/{branding.slug}. Changing it stops links, QR codes and emails already sent from working.
+          The name shows on every page and email. The web address is the organization&apos;s part of every link on this platform.
         </p>
         <EditForm
           toggle="Rename or change the web address"
@@ -35,7 +35,14 @@ export default async function BrandPage({ params }: PageProps<"/[org]/settings/b
           testId="organization-details"
           fields={[
             { name: "name", label: "Organization name", value: branding.name },
-            { name: "slug", label: "Web address", value: branding.slug, hint: `${new URL(publicEnv.appUrl).host}/…` },
+            {
+              name: "slug",
+              label: "Web address",
+              type: "web-address",
+              value: branding.slug,
+              base: `${new URL(publicEnv.appUrl).host}/`,
+              hint: "The organization's short name in every web address: lowercase letters, numbers and hyphens, such as streamspace. It isn't the organization's own website.",
+            },
           ]}
         />
       </Card>

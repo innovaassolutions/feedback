@@ -3,11 +3,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/client/api";
 import { Button, Field, Notice, cx, inputClass } from "@/components/ui";
+import { WebAddressField } from "@/components/forms/web-address-field";
 
 export type FieldSpec = {
   name: string;
   label: string;
-  type?: "text" | "date" | "number" | "textarea" | "select";
+  type?: "text" | "date" | "number" | "textarea" | "select" | "web-address";
   value: string | number;
   hint?: string;
   min?: number;
@@ -15,6 +16,10 @@ export type FieldSpec = {
   options?: Array<{ value: string; label: string }>;
   /** Shown but not sent, such as a web address only an organization admin may change. */
   locked?: boolean;
+  /** Said under a locked field, such as who can change it. */
+  lockedNote?: string;
+  /** For a web address: everything before the short name. */
+  base?: string;
   wide?: boolean;
 };
 
@@ -90,7 +95,19 @@ export function EditForm({
   return (
     <form action={save} className="grid gap-3 sm:grid-cols-2" data-testid={testId}>
       {fields.map((f) => (
-        <div key={f.name} className={cx(f.wide || f.type === "textarea" ? "sm:col-span-2" : "")}>
+        <div key={f.name} className={cx(f.wide || f.type === "textarea" || f.type === "web-address" ? "sm:col-span-2" : "")}>
+          {f.type === "web-address" ? (
+            <WebAddressField
+              name={f.name}
+              label={f.label}
+              base={f.base ?? ""}
+              help={f.hint ?? ""}
+              initial={String(f.value)}
+              current={String(f.value)}
+              locked={f.locked}
+              lockedNote={f.lockedNote}
+            />
+          ) : (
           <Field label={f.label} hint={f.hint}>
             {f.type === "textarea" ? (
               <textarea name={f.name} defaultValue={String(f.value)} rows={3} className={inputClass} />
@@ -113,6 +130,7 @@ export function EditForm({
               />
             )}
           </Field>
+          )}
         </div>
       ))}
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">

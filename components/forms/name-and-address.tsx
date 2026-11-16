@@ -1,7 +1,8 @@
 "use client";
-import { useId, useState } from "react";
-import { cx, inputClass } from "@/components/ui";
-import { parseSlug, suggestSlug } from "@/lib/slug";
+import { useState } from "react";
+import { inputClass } from "@/components/ui";
+import { suggestSlug } from "@/lib/slug";
+import { WebAddressField } from "./web-address-field";
 
 /**
  * A name and the short name for its web address. The address follows the name until someone
@@ -21,11 +22,9 @@ export function NameAndAddress({
   help: string;
   placeholder: string;
 }) {
-  const id = useId();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [edited, setEdited] = useState(false);
-  const check = slug ? parseSlug(slug) : null;
 
   return (
     <>
@@ -44,46 +43,16 @@ export function NameAndAddress({
           />
         </span>
       </label>
-      <div className="text-sm">
-        <label htmlFor={`${id}-slug`} className="font-medium">
-          Web address
-        </label>
-        <input
-          id={`${id}-slug`}
-          name="slug"
-          required
-          value={slug}
-          onChange={(e) => {
-            setSlug(e.target.value);
-            setEdited(e.target.value !== "");
-          }}
-          placeholder={placeholder}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-describedby={`${id}-help ${id}-check`}
-          className={cx(inputClass, "mt-1")}
-        />
-        <p id={`${id}-help`} className="mt-1 text-muted">
-          {help}
-        </p>
-        <p id={`${id}-check`} aria-live="polite" className="mt-1" data-testid="address-check">
-          {check && !check.ok ? (
-            <span className="text-danger">
-              {check.message}{" "}
-              {check.suggestion ? (
-                <button type="button" className="font-medium underline" onClick={() => setSlug(check.suggestion!)}>
-                  Use {check.suggestion}
-                </button>
-              ) : null}
-            </span>
-          ) : (
-            <span className="text-muted">
-              Its pages will be at <span className="font-medium text-text break-all">{base}{check?.ok ? check.slug : "…"}</span>
-            </span>
-          )}
-        </p>
-      </div>
+      <WebAddressField
+        base={base}
+        help={help}
+        placeholder={placeholder}
+        value={slug}
+        onChange={(v) => {
+          setSlug(v);
+          setEdited(v !== "");
+        }}
+      />
     </>
   );
 }

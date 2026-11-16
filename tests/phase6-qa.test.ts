@@ -302,6 +302,38 @@ describe("documentation sites", () => {
     const [chunk] = await sql()`select title, content from public.document_chunks where documentation_source_id = ${source.id}`;
     expect(chunk).toMatchObject({ title: "Export notes — Export notes", content: expect.stringContaining("Exported text with a stray NUL") });
   });
+
+  it("says why a site couldn't be read instead of calling it ready, and keeps pages read before", async () => {
+    const owen = await ctxAs("owen");
+    const status = async (id: string) => (await sql()`select status, error, page_count from public.documentation_sources where id = ${id}`)[0];
+
+    // An address with no page.
+    const missing = await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/no-such-docs/` });
+    await owen.runJobs();
+    expect(await status(missing.source.id)).toMatchObject({ status: "failed", error: expect.stringContaining("HTTP 404") });
+
+    // A page built in the browser: almost no text and no links.
+    pages["/app/"] = "<html><head><title>Docs</title></head><body><div id=root></div><script src=/app.js></script></body></html>";
+    const empty = await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/app/` });
+    await owen.runJobs();
+    expect(await status(empty.source.id)).toMatchObject({ status: "failed", error: expect.stringContaining("JavaScript") });
+
+    // A host that can't be reached.
+    const nowhere = await addDocumentationSource(owen, { organization_id: ids.northwind, url: "http://127.0.0.1:9/docs/" });
+    await owen.runJobs();
+    expect(await status(nowhere.source.id)).toMatchObject({ status: "failed", error: expect.stringContaining("couldn't be reached") });
+
+    // A site read before that is down on the next read keeps its pages.
+    pages["/kept/"] = page("Kept docs", "These pages were read once and must survive a failed re-read of the whole site.");
+    const kept = await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/kept/` });
+    await owen.runJobs();
+    expect(await status(kept.source.id)).toMatchObject({ status: "ready", page_count: 1 });
+    delete pages["/kept/"];
+    await addDocumentationSource(owen, { organization_id: ids.northwind, url: `${base}/kept/` });
+    await owen.runJobs();
+    expect(await status(kept.source.id)).toMatchObject({ status: "failed", page_count: 1 });
+    expect(await pagesStored(kept.source.id)).toHaveLength(1);
+  });
 });
 
 describe("Q&A figures", () => {

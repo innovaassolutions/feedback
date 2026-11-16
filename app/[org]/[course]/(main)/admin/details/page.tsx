@@ -15,7 +15,7 @@ export default async function CourseDetailsPage({ params }: PageProps<"/[org]/[c
       <Card className="mb-6">
         <h1 className="mb-1 text-lg font-semibold">Course details</h1>
         <p className="mb-4 text-sm text-muted">
-          The title shows on every page and email. The web address is the course&apos;s part of its links: {host}/{org}/{c.slug}. Changing it stops links, QR codes and emails already sent from working.
+          The title shows on every page and email. The settings apply to every session of the course.
         </p>
         <EditForm
           path={`/api/courses/${c.id}`}
@@ -26,10 +26,12 @@ export default async function CourseDetailsPage({ params }: PageProps<"/[org]/[c
             {
               name: "slug",
               label: "Web address",
+              type: "web-address",
               value: c.slug,
-              hint: orgAdmin ? `${host}/${org}/…` : "An organization admin can change it",
+              base: `${host}/${org}/`,
+              hint: "The course's short name in its web address: lowercase letters, numbers and hyphens, such as ime-engineering. It isn't a website address. Learners' links and the QR codes use it.",
               locked: !orgAdmin,
-              wide: true,
+              lockedNote: "Only an organization admin can change it.",
             },
             { name: "feedback_window_days", label: "Feedback window (days)", type: "number", value: c.feedback_window_days, min: 1, max: 90, hint: "How long feedback stays open" },
             { name: "follow_up_days", label: "Follow-up after (days)", type: "number", value: c.follow_up_days, min: 1, max: 365, hint: "After the last session" },

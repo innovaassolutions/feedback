@@ -111,16 +111,18 @@ export default async function CourseSetupPage({ params }: PageProps<"/[org]/[cou
         </Card>
         <Card>
           <h3 className="font-semibold">Interview guide</h3>
-          <p className="mb-2 text-sm text-muted">The rating questions and topics every session&apos;s feedback interview covers.</p>
-          <Link href={`${base}/guide`}>Edit the guide</Link>
+          <p className="mb-2 text-sm text-muted">
+            <span className="text-success">✓ Ready to use.</span> Every feedback interview asks the standard rating questions and topics. Nothing to do unless this course needs different ones.
+          </p>
+          <Link href={`${base}/guide`}>See the questions</Link>
         </Card>
       </div>
 
       {orgAdmin ? (
         <Card id="documentation">
-          <h2 className="mb-1 text-lg font-semibold">Product documentation</h2>
+          <h2 className="mb-1 text-lg font-semibold">Product documentation <span className="text-sm font-normal text-muted">(optional)</span></h2>
           <p className="mb-3 text-sm text-muted">
-            The Librarian answers learners&apos; questions from these pages together with each session&apos;s documents. They serve every course in {ctx.org.name}.
+            If the course teaches a product with public help pages, add their address. The Librarian then answers learners&apos; questions from the product&apos;s own instructions as well as each session&apos;s documents, and points out where they differ. It serves every course in {ctx.org.name}.
             {pages ? ` ${plural(pages, "page")} read so far.` : ""}
           </p>
           <DocumentationForm organizationId={ctx.org.id} sources={sources ?? []} />

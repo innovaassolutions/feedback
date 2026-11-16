@@ -91,22 +91,48 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
     }
     const allowed = (url: string) => (robots ? robots.isAllowed(url, USER_AGENT) !== false : true);
 
-    const queue = [normalize(root)];
+    const start = normalize(root);
+    const queue = [start];
     const visited = new Set<string>(queue);
     const pages = new Map<string, { title: string; text: string; hash: string }>();
+    // Why the address itself gave nothing, said to the admin if no page at all could be read.
+    let startProblem: string | null = null;
     while (queue.length && pages.size < MAX_PAGES) {
       const url = queue.shift()!;
-      if (!allowed(url)) continue;
+      const first = url === start;
+      if (!allowed(url)) {
+        if (first) startProblem = "The site's robots.txt asks readers like this one not to read these pages.";
+        continue;
+      }
       let res: Response;
       try {
         res = await fetcher(url);
       } catch {
+        if (first) startProblem = "The address couldn't be reached. Check it's spelt correctly and opens in a browser.";
         continue;
       }
-      if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) continue;
+      const type = res.headers.get("content-type") ?? "";
+      if (!res.ok) {
+        if (first) {
+          startProblem =
+            res.status === 401 || res.status === 403
+              ? `The site refused to show the page (HTTP ${res.status}). It may need a login; only public pages can be read.`
+              : res.status === 404
+                ? "There's no page at that address (HTTP 404). Check the address opens in a browser."
+                : `The site answered with an error (HTTP ${res.status}).`;
+        }
+        continue;
+      }
+      if (!type.includes("text/html")) {
+        if (first) startProblem = `That address isn't a web page${type ? ` (it's ${type.split(";")[0]})` : ""}.`;
+        continue;
+      }
       const html = (await res.text()).slice(0, MAX_BYTES);
       const page = pageText(html);
       if (page.text.length > 40) pages.set(url, { ...page, hash: createHash("sha256").update(page.text).digest("hex") });
+      else if (first && !page.links.length) {
+        startProblem = "The page had almost no text. The site may build its pages in the browser with JavaScript, which can't be read this way.";
+      }
       for (const href of page.links) {
         let next: URL;
         try {
@@ -120,6 +146,21 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
           queue.push(key);
         }
       }
+    }
+
+    const now = deps.now();
+    if (!pages.size) {
+      // Nothing readable: say why, keep any pages read before (the site may be down for a moment),
+      // and try again tomorrow.
+      await db
+        .from("documentation_sources")
+        .update({
+          status: "failed",
+          error: startProblem ?? "No readable pages were found at this address.",
+          next_read_at: new Date(now.getTime() + 86_400_000).toISOString(),
+        })
+        .eq("id", source.id);
+      return;
     }
 
     const { data: existing } = await db.from("document_chunks").select("page_url, page_hash").eq("documentation_source_id", source.id);
@@ -150,7 +191,6 @@ export async function readDocumentation(payload: { source_id: string }, deps: Jo
       );
       if (error) throw new Error(`store page: ${error.code}`);
     }
-    const now = deps.now();
     await db
       .from("documentation_sources")
       .update({ status: "ready", page_count: pages.size, error: null, last_read_at: now.toISOString(), next_read_at: new Date(now.getTime() + 7 * 86_400_000).toISOString() })
