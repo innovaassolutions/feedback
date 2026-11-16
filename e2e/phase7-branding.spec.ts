@@ -12,8 +12,15 @@ test("a platform admin creates a third organization, previews and approves its t
     .toBuffer();
 
   await signIn(page, "platformAdmin", "/platform");
-  await page.getByLabel("Name").fill("Harbour Learning");
-  await page.getByLabel("Address").fill(slug);
+  await page.getByLabel("Organization name").fill("Harbour Learning");
+  // The address follows the name until it's edited, and shows where the pages will be.
+  await expect(page.getByLabel("Web address")).toHaveValue("harbour-learning");
+  await page.getByLabel("Web address").fill("www.harbour.example");
+  await expect(page.getByTestId("address-check")).toContainText("That's a website address");
+  await page.getByRole("button", { name: "Use harbour" }).click();
+  await expect(page.getByLabel("Web address")).toHaveValue("harbour");
+  await page.getByLabel("Web address").fill(slug);
+  await expect(page.getByTestId("address-check")).toContainText(`/${slug}`);
   await page.getByLabel("Logo").setInputFiles({ name: "harbour.png", mimeType: "image/png", buffer: logo });
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page).toHaveURL(new RegExp(`/${slug}/settings/brand$`), { timeout: 60_000 });
@@ -36,7 +43,7 @@ test("a platform admin creates a third organization, previews and approves its t
   // Create a course with no code change.
   await page.getByRole("link", { name: "Courses" }).click();
   await page.getByLabel("Course title").fill("Harbour onboarding");
-  await page.getByLabel("Course address").fill("onboarding");
+  await page.getByLabel("Web address").fill("onboarding");
   await page.getByRole("button", { name: "Create course" }).click();
   await expect(page).toHaveURL(new RegExp(`/${slug}/onboarding/admin$`));
 

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { requireBranding } from "@/lib/branding";
 import { createUserClient } from "@/lib/supabase/server";
 import { createCourse } from "@/lib/actions/organizations";
-import { Card, Field, PageTitle, inputClass } from "@/components/ui";
+import { Card, PageTitle } from "@/components/ui";
 import { ActionForm } from "@/components/forms/action-form";
+import { NameAndAddress } from "@/components/forms/name-and-address";
+import { publicEnv } from "@/lib/env";
 
 export default async function CoursesPage({ params }: PageProps<"/[org]/settings/courses">) {
   const { org } = await params;
@@ -28,8 +30,13 @@ export default async function CoursesPage({ params }: PageProps<"/[org]/settings
         <ActionForm action={createCourse} submit="Create course">
           <input type="hidden" name="organization_id" value={branding.id} />
           <input type="hidden" name="org_slug" value={org} />
-          <Field label="Course title"><input name="title" required className={inputClass} /></Field>
-          <Field label="Course address" hint={`/${org}/…`}><input name="slug" required pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]" className={inputClass} /></Field>
+          <NameAndAddress
+            nameLabel="Course title"
+            nameField="title"
+            base={`${new URL(publicEnv.appUrl).host}/${org}/`}
+            placeholder="onboarding"
+            help="A short name for the course's pages. Lowercase letters, numbers and hyphens. It can't be changed later, because links and QR codes use it."
+          />
         </ActionForm>
       </Card>
     </>

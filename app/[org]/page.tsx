@@ -20,6 +20,7 @@ export default async function OrgHome({ params }: PageProps<"/[org]">) {
     ? [
         { href: `/${org}/settings/brand`, label: "Branding" },
         { href: `/${org}/settings/courses`, label: "Manage courses" },
+        { href: `/${org}/settings/people`, label: "People" },
       ]
     : [];
   return (

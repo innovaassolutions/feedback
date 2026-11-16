@@ -5,13 +5,17 @@ description: Add learners to a course. Each gets a sign-in link by email.
 
 Under **Admin**, open **Roster**. Paste the learners' addresses into **Email addresses**, one per line or separated by commas. `Name <email>` works too, and gives the learner a display name. Choose **Invite learners**.
 
-Each new learner is enrolled and emailed a sign-in link. The report underneath says how many were enrolled and lists any address that was:
+Each new learner is enrolled and emailed an invitation in your organization's branding. It names the course, explains the short interview after each session and how anonymity works, and says how to sign in: there's no password, and a new link can be had any time from the sign-in page. Someone who has signed in before gets a plain sign-in link. The report underneath says how many were enrolled and lists any address that was:
 
 - **skipped**: already enrolled, or repeated in the list
 - **invalid**: not an email address
 
+To send an invitation again, invite the same address again. A learner who hasn't signed in yet gets the invitation once more; one who has is skipped as already enrolled.
+
+If the report says some invitations couldn't be sent yet, an email limit was reached: one email per address a minute, about 100 invitations from the platform every five minutes, and the email service's daily allowance. The learners are enrolled. Invite the same addresses again a little later to send them.
+
 The **Learners** list shows everyone enrolled. The dashboard's **Responses** tile counts against this list, such as 7 of 8.
 
 <Callout title="Instructors and sponsors">
-  The roster adds learners. Instructors and sponsors are added by the platform team for now. Ask them with the person's name, email address and role.
+  The roster adds learners. Organization admins add instructors and sponsors on the organization's [People](/docs/running-a-course/people) page.
 </Callout>

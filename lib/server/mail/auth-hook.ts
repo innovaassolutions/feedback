@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Mailer } from "@/lib/server/email";
 import type { AdminClient } from "@/lib/server/supabase-admin";
 import { brandForSignIn } from "./brand";
+import { invitationFor } from "./invitation";
 import { brandedEmail } from "./layout";
 
 // Supabase Auth's send-email hook. Auth still creates and checks every sign-in link and applies its
@@ -87,6 +88,15 @@ export async function sendAuthEmail(input: unknown, deps: HookDeps): Promise<voi
   // A page of an organization the person isn't in would only show "Page not found", and its
   // address would name that organization in the email. Their own courses page instead.
   if (otherOrganization) link.searchParams.set("next", "/");
+
+  // Someone who has never signed in gets an invitation that says what it's for.
+  const { data: account } = await deps.admin.auth.admin.getUserById(user.id);
+  if (!account?.user?.last_sign_in_at) {
+    const who = { id: user.id, platformAdmin: user.app_metadata?.platform_admin === true };
+    const invitation = await invitationFor(deps.admin, who, brand, link.searchParams.get("next") ?? "/", link.toString(), deps.appUrl);
+    await deps.mailer.send(brandedEmail(user.email, invitation.subject, brand, invitation.content));
+    return;
+  }
   await deps.mailer.send(
     brandedEmail(user.email, brand.organization ? `Your sign-in link for ${brand.name}` : "Your sign-in link", brand, {
       preview: "It works once and expires in an hour.",

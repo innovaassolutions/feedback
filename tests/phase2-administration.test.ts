@@ -185,9 +185,15 @@ describe("the roster", () => {
     const rows = await sql()`select email from public.enrollments where course_id = ${ids.ime} and email = any(${emails})`;
     expect(rows.length).toBe(3);
 
+    // Auth sends one email per address per second on the test stack (a minute in production).
+    await new Promise((r) => setTimeout(r, 1500));
     const again = await inviteLearners(marcus, { course_id: ids.ime, emails: [emails[1]] });
+    // Not signed in yet, so inviting again sends the invitation again rather than skipping.
     expect(again.enrolled).toEqual([]);
-    expect(again.skipped).toEqual([{ email: emails[1], reason: "already enrolled" }]);
+    expect(again.resent).toEqual([emails[1]]);
+    expect(again.skipped).toEqual([]);
+    expect(again.unsent).toEqual([]);
+    expect(report.unsent).toEqual([]);
 
     for (const email of emails) {
       let found = false;

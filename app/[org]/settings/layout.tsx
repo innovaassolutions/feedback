@@ -24,6 +24,7 @@ export default async function SettingsLayout({ children, params }: LayoutProps<"
         nav={[
           { href: `/${org}/settings/brand`, label: "Branding" },
           { href: `/${org}/settings/courses`, label: "Courses" },
+          { href: `/${org}/settings/people`, label: "People" },
         ]}
       />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>

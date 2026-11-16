@@ -11,9 +11,11 @@ export type EmailBrand = {
   logo: { url: string; width: number; height: number } | null;
   /** False for the platform's own look, used when no single organization applies. */
   organization: boolean;
+  /** The organization's short name in web addresses, such as "streamspace". */
+  slug: string | null;
 };
 
-export const PLATFORM_BRAND: EmailBrand = { name: "Course Feedback Platform", tokens: PLATFORM_THEME, logo: null, organization: false };
+export const PLATFORM_BRAND: EmailBrand = { name: "Course Feedback Platform", tokens: PLATFORM_THEME, logo: null, organization: false, slug: null };
 
 type BrandingRow = { id: string; slug: string; name: string; logo_path: string | null; tokens: unknown };
 
@@ -41,6 +43,7 @@ async function brandOf(admin: AdminClient, row: BrandingRow): Promise<EmailBrand
         }
       : null,
     organization: true,
+    slug: row.slug,
   };
 }
 

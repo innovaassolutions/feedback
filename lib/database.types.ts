@@ -1491,6 +1491,15 @@ export type Database = {
         }[]
       }
       platform_admin_emails: { Args: never; Returns: string[] }
+      platform_admins: {
+        Args: never
+        Returns: {
+          email: string
+          last_sign_in_at: string
+          name: string
+          user_id: string
+        }[]
+      }
       quality_figures: { Args: never; Returns: Json }
       session_response_counts: {
         Args: { p_course: string }

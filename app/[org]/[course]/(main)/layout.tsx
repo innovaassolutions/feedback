@@ -8,7 +8,9 @@ export default async function MainLayout({ children, params }: LayoutProps<"/[or
   const nav: NavItem[] = [{ href: base, label: "Sessions" }];
   if (ctx.can.readResults) nav.push({ href: `${base}/dashboard`, label: "Dashboard" });
   if (ctx.can.manage) nav.push({ href: `${base}/admin`, label: "Admin" });
-  if (ctx.roles.has("org_admin") || ctx.roles.has("platform_admin")) nav.push({ href: `/${org}/settings/brand`, label: "Branding" });
+  if (ctx.roles.has("org_admin") || ctx.roles.has("platform_admin")) {
+    nav.push({ href: `/${org}/settings/brand`, label: "Branding" }, { href: `/${org}/settings/people`, label: "People" });
+  }
   return (
     <>
       <OrgHeader orgSlug={org} orgName={ctx.org.name} logoPath={ctx.org.logo_path} nav={nav} email={ctx.email} />

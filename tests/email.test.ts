@@ -7,7 +7,7 @@ import { renderEmail } from "@/lib/server/mail/layout";
 import { notifyBlocker } from "@/lib/server/notify";
 import { SEED_USERS, STREAMSPACE_THEME } from "@/lib/server/seed";
 import { derived, themeTokensSchema, type ThemeTokens } from "@/lib/theme/tokens";
-import { admin, seeded, userId } from "./support/db";
+import { admin, seeded, sql, userId } from "./support/db";
 
 const SECRET = `v1,whsec_${Buffer.from("a-secret-for-these-tests-only-0123456789").toString("base64")}`;
 const APP = "http://localhost:3100";
@@ -58,6 +58,7 @@ describe("email layout", () => {
     tokens: STREAMSPACE_THEME,
     logo: { url: "https://example.test/api/email-logo/x.png?v=1", width: 150, height: 40 },
     organization: true,
+    slug: "smith-jones",
   };
   const content = {
     preview: "Preview line",
@@ -127,6 +128,8 @@ describe("sign-in emails", () => {
     sam = { id: await userId("platformAdmin"), email: SEED_USERS.platformAdmin.email, platformAdmin: true };
     streamspace = await liveTokens("streamspace");
     northwind = await liveTokens("northwind");
+    // Both have signed in before, so they get a plain sign-in link rather than an invitation.
+    await sql()`update auth.users set last_sign_in_at = now() where id in (${aisha.id}, ${sam.id})`;
   });
 
   async function send(request: Request, secret: string | undefined = SECRET) {
@@ -190,6 +193,59 @@ describe("sign-in emails", () => {
   it("fall back to the app's confirm address when Auth replaced the redirect", () => {
     const link = signInLink(APP, APP, "email", "h");
     expect(link.toString()).toBe(`${APP}/auth/confirm?type=email&token_hash=h`);
+  });
+});
+
+describe("a person's first email", () => {
+  const stamp = Date.now();
+  let ids: Awaited<ReturnType<typeof seeded>>;
+  beforeAll(async () => {
+    ids = await seeded();
+  });
+
+  async function newAccount(email: string, platformAdmin = false) {
+    const { data, error } = await admin().auth.admin.createUser({ email, email_confirm: true, app_metadata: platformAdmin ? { platform_admin: true } : {} });
+    if (error) throw error;
+    return { id: data.user.id, email, platformAdmin };
+  }
+
+  async function firstEmail(who: { id: string; email: string; platformAdmin?: boolean }, next: string) {
+    const outbox: Email[] = [];
+    const res = await handleSendEmailHook(hookRequest(payload(who, next)), { admin: admin(), mailer: { send: async (e) => void outbox.push(e) }, appUrl: APP, secret: SECRET });
+    expect(res.status).toBe(200);
+    return outbox[0];
+  }
+
+  it("invites a new learner to give feedback, and says how signing in works", async () => {
+    const learner = await newAccount(`new.learner.${stamp}@invite.example`);
+    await sql()`insert into public.enrollments (organization_id, course_id, user_id, display_name, email) values (${ids.streamspace}, ${ids.ime}, ${learner.id}, 'New Learner', ${learner.email})`;
+    const email = await firstEmail(learner, "/streamspace/ime-engineering");
+    expect(email.subject).toBe("You're invited to give feedback on Streamspace platform training: IME Engineering");
+    expect(email.text).toContain("a short interview of about five minutes");
+    expect(email.text).toContain(`There's no password. Whenever you want to sign in, enter this email address at ${APP}/streamspace/sign-in`);
+    expect(email.text).toContain(`If it has expired, get a new one at ${APP}/streamspace/sign-in.`);
+    expect(email.html).toContain(">You&#39;re invited</h1>");
+  });
+
+  it("tells a new sponsor what they'll see, and a new platform admin what they can do", async () => {
+    const sponsor = await newAccount(`new.sponsor.${stamp}@invite.example`);
+    await sql()`insert into public.memberships (organization_id, course_id, user_id, role, display_name, email) values (${ids.streamspace}, ${ids.ime}, ${sponsor.id}, 'sponsor', 'New Sponsor', ${sponsor.email})`;
+    const toSponsor = await firstEmail(sponsor, "/streamspace/ime-engineering");
+    expect(toSponsor.subject).toBe("You can now view the results of Streamspace platform training: IME Engineering");
+    expect(toSponsor.text).toContain("Nothing is shown from a single learner.");
+
+    const platformAdmin = await newAccount(`new.platform.${stamp}@invite.example`, true);
+    const toAdmin = await firstEmail(platformAdmin, "/platform");
+    expect(toAdmin.subject).toBe("You're now a platform admin of the Course Feedback Platform");
+    expect(toAdmin.text).toContain(`${APP}/sign-in`);
+  });
+
+  it("names the organization even when the link opens the home page", async () => {
+    const learner = await newAccount(`home.learner.${stamp}@invite.example`);
+    await sql()`insert into public.enrollments (organization_id, course_id, user_id, display_name, email) values (${ids.streamspace}, ${ids.ime}, ${learner.id}, 'Home Learner', ${learner.email})`;
+    const email = await firstEmail(learner, "/");
+    expect(email.subject).toBe("You're invited to Streamspace");
+    expect(email.text).toContain(`${APP}/streamspace/sign-in`);
   });
 });
 

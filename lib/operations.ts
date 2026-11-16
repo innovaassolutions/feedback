@@ -12,6 +12,7 @@ export const ANONYMITY_LEVELS = ["named", "anonymous", "private"] as const;
 export const INTERVIEW_KINDS = ["session", "follow_up"] as const;
 export const SESSION_STATES = ["draft", "scheduled", "open", "closed"] as const;
 export const ACTION_STATUSES = ["planned", "in_progress", "done"] as const;
+export const STAFF_ROLES = ["org_admin", "instructor", "sponsor"] as const;
 
 type Op<S extends z.ZodType> = { method: "GET" | "POST" | "DELETE"; path: string; description: string; input: S };
 const op = <S extends z.ZodType>(method: Op<S>["method"], path: string, description: string, input: S): Op<S> => ({ method, path, description, input });
@@ -56,6 +57,27 @@ export const operations = {
     "Enrolls learners and sends magic links",
     z.object({ course_id: id, emails: z.array(z.string().trim().min(1).max(320)).min(1).max(500) }),
   ),
+  add_staff: op(
+    "POST",
+    "/api/organizations/{organization_id}/staff",
+    "Gives a person an organization admin, instructor or sponsor role, creating their account and sending a sign-in link",
+    z.object({
+      organization_id: id,
+      name: text(120),
+      email: z.string().trim().toLowerCase().pipe(z.email()),
+      role: z.enum(STAFF_ROLES),
+      // Instructors and sponsors belong to one course; an organization admin to none.
+      course_id: id.nullable(),
+    }),
+  ),
+  remove_staff: op("DELETE", "/api/staff/{membership_id}", "Removes one organization admin, instructor or sponsor role", z.object({ membership_id: id })),
+  add_platform_admin: op(
+    "POST",
+    "/api/platform/admins",
+    "Makes a person a platform admin, creating their account and sending a sign-in link",
+    z.object({ name: text(120), email: z.string().trim().toLowerCase().pipe(z.email()) }),
+  ),
+  remove_platform_admin: op("DELETE", "/api/platform/admins/{user_id}", "Removes a person's platform admin access", z.object({ user_id: id })),
   start_interview: op(
     "POST",
     "/api/sessions/{session_id}/interviews",

@@ -17,7 +17,8 @@ test("a learner signs in by magic link and lands on the course page", async ({ p
   const link = await waitForSignInLink(SEED_USERS.aisha.email, sentAt);
   // Auth hands the email to the app, which sends it in Streamspace's branding with its logo as a PNG.
   const [email] = await inbox(SEED_USERS.aisha.email);
-  expect(email.Subject).toBe("Your sign-in link for Streamspace");
+  // A first sign-in is an invitation to the course; later ones are plain sign-in links.
+  expect(email.Subject).toMatch(/^(You're invited to give feedback on Streamspace platform training: IME Engineering|Your sign-in link for Streamspace)$/);
   const logoSrc = /src="([^"]*\/api\/email-logo\/streamspace\.png[^"]*)"/.exec(await messageHtml(email.ID))?.[1];
   expect(logoSrc).toBeTruthy();
   const logo = await page.request.get(logoSrc!.replace(/&amp;/g, "&"));
@@ -83,8 +84,8 @@ test("header links are readable: each takes the theme's on-primary color, not th
     probe.remove();
     return { background: getComputedStyle(el).backgroundColor, onPrimary, links: [...el.querySelectorAll("a")].map((a) => getComputedStyle(a).color) };
   });
-  // The organization name, then Sessions, Dashboard, Admin, Branding and Help.
-  expect(colors.links).toHaveLength(6);
+  // The organization name, then Sessions, Dashboard, Admin, Branding, People and Help.
+  expect(colors.links).toHaveLength(7);
   for (const color of colors.links) {
     expect(color).toBe(colors.onPrimary);
     expect(color).not.toBe(colors.background);

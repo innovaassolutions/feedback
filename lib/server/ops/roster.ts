@@ -49,6 +49,15 @@ export async function inviteLearners(ctx: Ctx, input: OperationInput<"invite_lea
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
   const redirect = signInRedirect(ctx.origin, `/${course.organizations.slug}/${course.slug}`);
+  const resent: string[] = [];
+  // Addresses whose email Auth wouldn't send yet: a limit was reached (one per address a minute,
+  // a cap per sender, or the email service's daily limit). They're enrolled; inviting them again resends.
+  const unsent: string[] = [];
+  const sendLink = async (email: string) => {
+    const sent = await mailClient.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: redirect } });
+    if (sent.error) console.error(`[invite_learners] invitation not sent: ${sent.error.name}`);
+    return !sent.error;
+  };
 
   for (const entry of input.emails.flatMap(splitPasted)) {
     const invitee = parseInvitee(entry);
@@ -62,7 +71,14 @@ export async function inviteLearners(ctx: Ctx, input: OperationInput<"invite_lea
     }
     seen.add(invitee.email);
     if (enrolledEmails.has(invitee.email)) {
-      skipped.push({ email: invitee.email, reason: "already enrolled" });
+      // Inviting again resends the invitation to someone who hasn't signed in yet, so an email
+      // that couldn't be sent, or got lost, can be sent again.
+      const { data: id } = await ctx.admin.rpc("user_id_by_email", { p_email: invitee.email });
+      const { data: account } = id ? await ctx.admin.auth.admin.getUserById(id) : { data: null };
+      if (account?.user && !account.user.last_sign_in_at) {
+        if (await sendLink(invitee.email)) resent.push(invitee.email);
+        else unsent.push(invitee.email);
+      } else skipped.push({ email: invitee.email, reason: "already enrolled" });
       continue;
     }
 
@@ -94,12 +110,8 @@ export async function inviteLearners(ctx: Ctx, input: OperationInput<"invite_lea
       }
       throw new Error(`enroll: ${error.message}`);
     }
-    const sent = await mailClient.auth.signInWithOtp({
-      email: invitee.email,
-      options: { shouldCreateUser: false, emailRedirectTo: redirect },
-    });
-    if (sent.error) console.error(`[invite_learners] magic link not sent: ${sent.error.name}`);
+    if (!(await sendLink(invitee.email))) unsent.push(invitee.email);
     enrolled.push(invitee);
   }
-  return { enrolled, skipped, invalid };
+  return { enrolled, skipped, invalid, resent, unsent };
 }
