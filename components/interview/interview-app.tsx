@@ -5,6 +5,7 @@ import { ANONYMITY_LABEL } from "@/lib/labels";
 import { Button, Card, Notice, cx, inputClass } from "@/components/ui";
 import type { ChatMessage, PublicInterview } from "@/lib/server/ops/interviews";
 import { VoiceButton, type VoiceState } from "@/components/interview/voice";
+import { PostedQuestions, type PostedQuestion } from "@/components/interview/posted-questions";
 
 type Anonymity = "named" | "anonymous" | "private";
 
@@ -60,6 +61,8 @@ function StageMarker({ stage }: { stage: string }) {
 
 export function InterviewApp(props: {
   sessionId: string;
+  /** The session's page, where its Q&A board is. */
+  boardHref: string;
   kind: "session" | "follow_up";
   initial: { interview: PublicInterview; messages: ChatMessage[] } | null;
   voiceEnabled: boolean;
@@ -68,6 +71,7 @@ export function InterviewApp(props: {
   const [messages, setMessages] = useState<ChatMessage[]>(props.initial?.messages ?? []);
   const [anonymity, setAnonymity] = useState<Anonymity>(props.initial?.interview.anonymity ?? "anonymous");
   const [error, setError] = useState<string | null>(null);
+  const [posted, setPosted] = useState<PostedQuestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState(props.initial?.interview.state !== undefined && props.initial.interview.state !== "in_progress");
@@ -110,13 +114,14 @@ export function InterviewApp(props: {
     setBusy(true);
     setError(null);
     setMessages((m) => [...m, { role: "learner", text: turn, mode }]);
-    const res = await api<{ reply: ChatMessage; interview: PublicInterview }>("POST", `/api/interviews/${interview.id}/turns`, { text: turn, mode });
+    const res = await api<{ reply: ChatMessage; interview: PublicInterview; questions?: PostedQuestion[] }>("POST", `/api/interviews/${interview.id}/turns`, { text: turn, mode });
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
       return null;
     }
     setMessages((m) => [...m, res.data.reply]);
+    if (res.data.questions?.length) setPosted((p) => [...p, ...res.data.questions!.filter((q) => !p.some((x) => x.id === q.id))]);
     applyInterview(res.data.interview);
     return res.data.reply.text;
   }
@@ -306,6 +311,7 @@ export function InterviewApp(props: {
           <Button type="submit" disabled={busy || !text.trim()}>Send</Button>
         </form>
       </Card>
+      <PostedQuestions sessionId={props.sessionId} questions={posted} boardHref={props.boardHref} />
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       {interview.stage === "read_back" ? (

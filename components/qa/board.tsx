@@ -8,7 +8,7 @@ import type { QuestionView } from "@/lib/server/ops/questions";
 
 type Answer = QuestionView["answers"][number];
 
-function Citations({ answer }: { answer: Answer }) {
+export function Citations({ answer }: { answer: Answer }) {
   if (!answer.citations.length) return null;
   return (
     <ul className="mt-2 space-y-1 text-sm" data-testid="citations">

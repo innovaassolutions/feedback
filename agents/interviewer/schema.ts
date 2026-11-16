@@ -46,6 +46,8 @@ export type Progress = {
   proposed_summary: string[] | null;
   blockers_flagged: number;
   questions_raised: number;
+  /** The questions posted so far, normalised, so one isn't posted twice. Missing on older interviews. */
+  posted_questions?: string[];
   /** The learner turn at which the read-back began, for the rubric's limits check. */
   read_back_turn?: number | null;
   /** Seconds spent in the interview so far. The time limit counts these, not the time since it started. */

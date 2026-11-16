@@ -73,3 +73,32 @@ test("chips, a stage marker, and a summary screen to edit points and change anon
   const { data: iv } = await db.from("interviews").select("anonymity, summary, summary_edited, participant_id, interview_rating").eq("session_id", session!.id).single();
   expect(iv).toMatchObject({ anonymity: "private", participant_id: null, summary_edited: true, interview_rating: "helpful" });
 });
+
+test("a question asked during the interview is posted once and its answer shows in the interview", async ({ page }) => {
+  const n = await openSession("Question in interview");
+  await signIn(page, "hamish", `/streamspace/ime-engineering/sessions/${n}/interview`);
+  await page.getByRole("button", { name: "Start with chat" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  for (const chip of ["Yes, with the guide beside me", "About right", "Some of it"]) await page.getByTestId("rating-chip").filter({ hasText: chip }).click();
+  await page.getByTestId("rating-chip").filter({ hasText: /^7$/ }).click();
+  await expect(page.getByTestId("stage-marker").locator("[aria-current=step]")).toHaveText("Conversation");
+
+  await page.getByLabel("Your answer").fill("How do I find my project ID?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByTestId("interviewer-bubble").last()).toContainText("post it");
+  await page.getByLabel("Your answer").fill("Yes please");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const cards = page.getByTestId("posted-question");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("How do I find my project ID?");
+  // The Librarian answers, or sends it to the instructor; either way the card says so.
+  await expect(cards.first()).not.toContainText("Finding the answer", { timeout: 30_000 });
+  await expect(cards.first()).toContainText(/AI answer|Answered by instructor|your instructor will answer/);
+
+  const { data } = await admin().from("questions").select("id").eq("text", "How do I find my project ID?").eq("origin", "interview").gte("created_at", new Date(Date.now() - 120_000).toISOString());
+  expect((data ?? []).length).toBeGreaterThanOrEqual(1);
+  const { data: mine } = await admin().from("sessions").select("id").eq("number", n).single();
+  const { data: onBoard } = await admin().from("questions").select("id").eq("session_id", mine!.id);
+  expect(onBoard).toHaveLength(1);
+});

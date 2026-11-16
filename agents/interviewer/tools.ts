@@ -26,7 +26,7 @@ export function interviewerTools(effects: ToolEffect[]) {
       inputSchema: z.object({ text: z.string().min(3).max(2000) }),
       execute: async ({ text }) => {
         effects.push({ type: "raise_question", text });
-        return { posted: true };
+        return { posted: true, note: "Posted. Don't post it again." };
       },
     }),
     flag_blocker: tool({

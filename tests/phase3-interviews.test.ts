@@ -318,6 +318,24 @@ describe("raise_question", () => {
     expect(qs[0].n).toBe(0);
   });
 
+  it("posts once when the model asks to post the same question twice in a turn, and says which it posted", async () => {
+    const { s, ctx, interview } = await toConversation("diego", "Question twice");
+    await sendTurn(ctx, { interview_id: interview.id, text: "How do I find my project ID?", mode: "text" });
+    // The learner agrees, and the model calls raise_question twice before replying.
+    overrideStubBrain("interviewer", (call) =>
+      call.toolResults.length >= 2
+        ? { text: JSON.stringify({ reply: "Done, it's on the board. What else?", topic_action: "stay", learner_declined: false, offered_to_post_question: true }) }
+        : { toolCalls: [{ name: "raise_question", input: { text: "How do I find my project ID?" } }] },
+    );
+    const agreed = await sendTurn(ctx, { interview_id: interview.id, text: "Yes please", mode: "text" });
+    expect(agreed.questions).toHaveLength(1);
+    expect(agreed.questions[0].text).toBe("How do I find my project ID?");
+    // Offered again and agreed again: the same question isn't posted a second time.
+    await sendTurn(ctx, { interview_id: interview.id, text: "Yes, post it", mode: "text" });
+    const qs = await sql()`select id from public.questions where session_id = ${s.id}`;
+    expect(qs.map((q) => q.id)).toEqual([agreed.questions[0].id]);
+  });
+
   it("code refuses a raise_question the model calls without having offered first", async () => {
     overrideStubBrain("interviewer", (call) =>
       call.toolResults.length

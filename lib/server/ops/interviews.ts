@@ -146,7 +146,9 @@ export async function startInterview(ctx: Ctx, input: OperationInput<"start_inte
   return { interview: publicInterview(iv, setup, {}), messages: [{ role: "interviewer", text: opening, mode: "text" }] as ChatMessage[] };
 }
 
-async function applyEffects(ctx: Ctx, iv: InterviewRow, result: EngineResult) {
+/** Carries out what the turn asked for. Returns the questions it posted, for the learner's screen. */
+async function applyEffects(ctx: Ctx, iv: InterviewRow, result: EngineResult): Promise<Array<{ id: string; text: string }>> {
+  const posted: Array<{ id: string; text: string }> = [];
   for (const e of result.effects) {
     if (e.type === "raise_question") {
       let authorName: string | null = null;
@@ -168,7 +170,10 @@ async function applyEffects(ctx: Ctx, iv: InterviewRow, result: EngineResult) {
         })
         .select("id")
         .single();
-      if (q) await enqueue(ctx.admin, { kind: "answer_question", payload: { question_id: q.id }, organizationId: iv.organization_id });
+      if (q) {
+        await enqueue(ctx.admin, { kind: "answer_question", payload: { question_id: q.id }, organizationId: iv.organization_id });
+        posted.push({ id: q.id, text: e.text });
+      }
     } else if (e.type === "flag_blocker") {
       await enqueue(ctx.admin, {
         kind: "notify_blocker",
@@ -177,6 +182,7 @@ async function applyEffects(ctx: Ctx, iv: InterviewRow, result: EngineResult) {
       });
     }
   }
+  return posted;
 }
 
 /** Adds the learner's turn and returns the Interviewer's reply. */
@@ -215,11 +221,11 @@ export async function sendTurn(ctx: Ctx, input: OperationInput<"send_turn">) {
     .select("*")
     .single();
   if (error || !updated) throw conflict("This interview changed in another window. Reload the page.");
-  await applyEffects(ctx, iv, result);
+  const questions = await applyEffects(ctx, iv, result);
   await writeRuns(ctx, iv, result.runs, agent.version, turnModel.id);
   if (result.effects.length) kickJobs(ctx);
   const ratings = { ...state.ratings, ...Object.fromEntries(result.ratingsToSave.map((r) => [r.item_id, r.choice])) };
-  return { reply: { role: "interviewer", text: result.reply, mode: "text" } as ChatMessage, interview: publicInterview(updated, setup, ratings) };
+  return { reply: { role: "interviewer", text: result.reply, mode: "text" } as ChatMessage, interview: publicInterview(updated, setup, ratings), questions };
 }
 
 async function upsertRating(ctx: Ctx, iv: InterviewRow, itemId: string, choice: string) {

@@ -2,7 +2,7 @@
 
 **All eight phases are built.** 80 of the plan's 85 criteria are verified and ticked. The five that aren't are Live criteria: two voice trials need a person speaking (the Vocal Bridge key and agent are set up and checked), and three need the client's real Session 1 rebuild guide or Streamspace logo. See [Not yet verified](#not-yet-verified).
 
-Last checked on 16 November 2026: `npm run check` passes (type check, lint, 174 Vitest tests in 20 files) and `npm run e2e` passes (30 Playwright tests) while `npm run dev` is running.
+Last checked on 16 November 2026: `npm run check` passes (type check, lint, 175 Vitest tests in 20 files) and `npm run e2e` passes (31 Playwright tests) while `npm run dev` is running.
 
 **Production** runs at https://feedback.innovaas.co (see [Deploying](#deploying)). The user guide is at `/docs`. `npm run evals` passes against the real model (16 November 2026: rubric 90.7%, themes 95.8%, Librarian 8 of 8). The rubric was 97.7% on the run before with the same Interviewer; persona runs vary, and this one was close to the 90% mark.
 

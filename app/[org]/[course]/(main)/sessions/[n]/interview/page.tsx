@@ -59,7 +59,7 @@ export default async function InterviewPage({ params, searchParams }: PageProps<
           <p>{blocked}</p>
         </Card>
       ) : (
-        <InterviewApp sessionId={session.id} kind={kind} initial={resumed} voiceEnabled={voiceConfigured()} />
+        <InterviewApp sessionId={session.id} boardHref={`/${org}/${course}/sessions/${session.number}`} kind={kind} initial={resumed} voiceEnabled={voiceConfigured()} />
       )}
     </div>
   );

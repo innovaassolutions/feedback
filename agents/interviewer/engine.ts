@@ -433,12 +433,20 @@ export async function handleLearnerTurn(
   }, runs);
 
   let ending = false;
+  // A model can ask to post the same question twice in one turn (again after the first call
+  // succeeds), or post it again on a later turn. Code allows one per turn, and never the same one twice.
+  const posted = new Set(progress.posted_questions ?? []);
+  let postedThisTurn = false;
   for (const e of asked) {
     if (e.type === "raise_question") {
+      const key = e.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       // Code holds the consent rule: only if the previous turn offered and this is the reply.
-      if (progress.last_offer && progress.questions_raised < 3) {
+      if (progress.last_offer && progress.questions_raised < 3 && !postedThisTurn && !posted.has(key)) {
         effects.push(e);
         progress.questions_raised++;
+        posted.add(key);
+        progress.posted_questions = [...posted];
+        postedThisTurn = true;
       } else refused.push(e);
     } else if (e.type === "flag_blocker") {
       acceptBlocker(e, output);
