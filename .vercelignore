@@ -1,0 +1,16 @@
+# Never upload local secrets, local state or test output with `vercel deploy`.
+.env*
+!.env.example
+.next
+.next-e2e
+.next-prodcheck
+.source
+.test-stack
+.data
+test-results
+playwright-report
+coverage
+supabase/.branches
+supabase/.temp
+evals/reports
+*.tsbuildinfo
