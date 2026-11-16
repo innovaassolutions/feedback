@@ -3,7 +3,7 @@
 // every port moved from 543xx to 553xx and the site address moved to port 3100.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
@@ -11,8 +11,11 @@ const stackDir = path.join(root, ".test-stack");
 const supaDir = path.join(stackDir, "supabase");
 export const TEST_ENV_FILE = path.join(stackDir, ".env");
 const EXCLUDE = "studio,imgproxy,vector,logflare,supavisor,edge-runtime,postgres-meta";
+// The test stack's send-email hook secret. It signs requests between two local test processes only.
+const TEST_HOOK_SECRET = `v1,whsec_${Buffer.from("feedback-test-stack-send-email-hook").toString("base64")}`;
 
-export function sync() {
+/** Writes the test stack's config. Returns true when it differs from the one the stack has. */
+export function sync(): boolean {
   mkdirSync(supaDir, { recursive: true });
   let config = readFileSync(path.join(root, "supabase", "config.toml"), "utf8");
   config = config
@@ -20,12 +23,17 @@ export function sync() {
     .replace(/\b543(\d\d)\b/g, "553$1")
     .replace(/localhost:3000/g, "localhost:3100")
     .replace(/127\.0\.0\.1:3000/g, "127.0.0.1:3100")
+    .replace(/host\.docker\.internal:3000/g, "host.docker.internal:3100")
+    .replace(/env\(SEND_EMAIL_HOOK_SECRET\)/g, TEST_HOOK_SECRET)
     .replace(/inspector_port = 8083/, "inspector_port = 8093");
-  writeFileSync(path.join(supaDir, "config.toml"), config);
+  const configPath = path.join(supaDir, "config.toml");
+  const changed = !existsSync(configPath) || readFileSync(configPath, "utf8") !== config;
+  writeFileSync(configPath, config);
   for (const dir of ["migrations", "templates"]) {
     rmSync(path.join(supaDir, dir), { recursive: true, force: true });
     cpSync(path.join(root, "supabase", dir), path.join(supaDir, dir), { recursive: true });
   }
+  return changed;
 }
 
 function supabase(args: string[], quiet = false): string {
@@ -68,13 +76,20 @@ function writeEnv(s: Record<string, string>) {
     // Unreachable on purpose: tests never call the real voice service.
     VOCAL_BRIDGE_API_URL: "http://127.0.0.1:9",
     CRON_SECRET: "test-cron-secret",
+    SEND_EMAIL_HOOK_SECRET: TEST_HOOK_SECRET,
   };
   writeFileSync(TEST_ENV_FILE, Object.entries(lines).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
 }
 
 export function ensure() {
-  sync();
+  const changed = sync();
   let s = status();
+  if (s && changed) {
+    // A running stack keeps the config it started with, so a changed one needs a restart.
+    console.log("The test stack's config changed; restarting it…");
+    stop();
+    s = null;
+  }
   if (!s) {
     console.log("Starting the test Supabase stack…");
     supabase(["start", "-x", EXCLUDE]);

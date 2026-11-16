@@ -2,7 +2,7 @@
 
 **All eight phases are built.** 80 of the plan's 85 criteria are verified and ticked. The five that aren't are Live criteria: two voice trials need a person speaking (the Vocal Bridge key and agent are set up and checked), and three need the client's real Session 1 rebuild guide or Streamspace logo. See [Not yet verified](#not-yet-verified).
 
-Last checked on 16 November 2026: `npm run check` passes (type check, lint, 117 Vitest tests in 14 files) and `npm run e2e` passes (24 Playwright tests) while `npm run dev` is running.
+Last checked on 16 November 2026: `npm run check` passes (type check, lint, 129 Vitest tests in 15 files) and `npm run e2e` passes (24 Playwright tests) while `npm run dev` is running.
 
 **Production** runs at https://feedback.innovaas.co (see [Deploying](#deploying)). The user guide is at `/docs`. `npm run evals` passes against the real model (rubric 97.7%, themes 95.8%).
 
@@ -19,6 +19,7 @@ Last checked on 16 November 2026: `npm run check` passes (type check, lint, 117 
 | 7. Branding and a new tenant | The Brand designer, contrast adjustment, the preview and approval page, theme history, organization and course creation |
 | 8. Quality, reminders and follow-up | `agent_runs` for every agent call, the rubric job, the quality page, alerts, the review queue and labelled-set candidates, the eval merge gate in CI, reminders, the follow-up interview, retention and a learner's removal request |
 | After the build: user guide | A user guide at `/docs`, built with Fumadocs from the MDX pages in `content/docs`: sign-in, the learner's interview, anonymity, voice, Q&A, the dashboard, transcripts, running a course, branding, platform administration, the agents, privacy, settings and an FAQ. It uses the platform theme's colors, has search, and is linked as Help in every course header |
+| After the build: branded emails | Every email uses its organization's live theme: sign-in links and invitations, reminders, the follow-up invitation, blocker alerts and questions for instructors (`lib/server/mail/`). Sign-in emails come through Supabase Auth's send-email hook (`/api/auth/send-email`); logos are served to mail apps as PNGs (`/api/email-logo/<slug>.png`). The quality alert uses the platform's look |
 
 The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.8.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
 
@@ -28,6 +29,7 @@ Needs Node 20.9 or later, Docker running, and the Supabase CLI (built with 2.75)
 
 ```bash
 npm install
+# supabase start needs SEND_EMAIL_HOOK_SECRET in supabase/.env, and .env.local needs the same value (see .env.example)
 supabase start -x studio,imgproxy,vector,logflare,supavisor,edge-runtime   # Postgres, Auth, Storage, Realtime and the mail inbox; -x skips services the app doesn't use
 supabase status -o env         # copy the URL and keys into .env.local (see .env.example)
 npm run db:reset               # rebuild and seed: "Seeded 2 organizations, 2 courses, 4 sessions and 16 users"
@@ -36,7 +38,7 @@ npm run dev                    # http://localhost:3000
 npm run jobs                   # optional: run the scheduled work once (reminders, alerts, retention…)
 ```
 
-Sign in at `http://localhost:3000/streamspace/sign-in` with a seeded address and open the link from the local inbox at `http://localhost:54324`. Everyone is fictional; addresses use the reserved `.example` domain.
+Sign in at `http://localhost:3000/streamspace/sign-in` with a seeded address and open the link from the local inbox at `http://localhost:54324`. Auth hands sign-in emails to the app (`/api/auth/send-email`) to send in the organization's branding, so they arrive only while `npm run dev` is running. Everyone is fictional; addresses use the reserved `.example` domain.
 
 **Trying it on a phone.** Phone and computer must be on the same network. Open the app on the computer at its `.local` name rather than `localhost` (find the name with `scutil --get LocalHostName`, then use `http://<name>.local:3000`), sign in there, and the session page's QR code points at that address. The learner's sign-in email links back to the same address, and the phone can read the local inbox at `http://<name>.local:54324`. An IP address such as `192.168.1.20` doesn't work: Supabase Auth refuses to redirect to IP addresses other than loopback. iPhones resolve `.local` names; some Android phones don't. Voice needs HTTPS on a phone, so over the local network the interview is typed only.
 

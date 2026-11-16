@@ -1,3 +1,6 @@
+import { publicEnv } from "@/lib/env";
+import { PLATFORM_BRAND } from "@/lib/server/mail/brand";
+import { brandedEmail } from "@/lib/server/mail/layout";
 import type { JobDeps } from "@/lib/server/jobs/queue";
 import { markOnce } from "@/lib/server/jobs/queue";
 import type { Json } from "@/lib/database.types";
@@ -82,7 +85,14 @@ export async function checkAlerts(deps: JobDeps) {
   if (!(await markOnce(deps.admin, `alert:${now.toISOString().slice(0, 10)}`, null, "alert_sent"))) return [];
   const { data: emails } = await deps.admin.rpc("platform_admin_emails");
   for (const to of (emails as string[] | null) ?? []) {
-    await deps.mailer.send({ to, subject: "Agent quality alert", text: `${alerts.join("\n\n")}\n\nSee the quality page for figures by agent and AGENT.md version.` });
+    await deps.mailer.send(
+      brandedEmail(to, "Agent quality alert", PLATFORM_BRAND, {
+        preview: alerts[0],
+        heading: "Agent quality alert",
+        body: [...alerts, "See the quality page for figures by agent and AGENT.md version."],
+        button: { label: "Open the quality page", url: `${publicEnv.appUrl}/platform/quality` },
+      }),
+    );
   }
   return alerts;
 }

@@ -68,12 +68,11 @@ async function citationsFor(db: AdminClient, hits: SourceHit[], orgSlug: string,
 
 async function sendToInstructor(deps: JobDeps, q: { id: string; course_id: string; text: string; session_number: number }, reason: string) {
   await deps.admin.from("questions").update({ sent_to_instructor_at: deps.now().toISOString() }).eq("id", q.id);
-  await emailInstructors(
-    deps,
-    q.course_id,
-    `A question needs your answer (Session ${q.session_number})`,
-    `${reason}\n\nThe question:\n${q.text}\n\nAnswer it on the session's Q&A board.`,
-  );
+  await emailInstructors(deps, q.course_id, {
+    subject: `A question needs your answer (Session ${q.session_number})`,
+    body: [reason, "The question:", { quote: q.text }, "Answer it on the session's Q&A board."],
+    button: { label: "Answer the question", path: `sessions/${q.session_number}#q-${q.id}` },
+  });
 }
 
 /**

@@ -270,6 +270,14 @@ max_frequency = "5s"
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
+# Sign-in emails are sent by the app (app/api/auth/send-email), so each carries its organization's
+# branding. Auth still makes the links and applies the rate limits. The secret comes from
+# supabase/.env, which git ignores; .env.local holds the same value as SEND_EMAIL_HOOK_SECRET.
+[auth.hook.send_email]
+enabled = true
+uri = "http://host.docker.internal:3000/api/auth/send-email"
+secrets = "env(SEND_EMAIL_HOOK_SECRET)"
+
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 [auth.sms.twilio]
 enabled = false

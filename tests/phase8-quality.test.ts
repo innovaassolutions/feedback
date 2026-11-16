@@ -156,6 +156,10 @@ describe("reminders", () => {
     await sendReminders(deps(at(25), box));
     expect(mine(box).length).toBe(enrolled - 2);
     expect(mine(box).map((e) => e.to)).not.toContain("aisha.bello@ime-engineering.example");
+    // In Streamspace's live theme, with the interview link as the button.
+    const { data: branding } = await admin().rpc("get_branding", { p_slug: "streamspace" });
+    expect(mine(box)[0].html).toContain(`background-color:${(branding as { tokens: { light: { primary: string } } }).tokens.light.primary}`);
+    expect(mine(box)[0].html).toMatch(new RegExp(`href="[^"]*/streamspace/ime-engineering/sessions/${s.number}/interview"`));
     await sendReminders(deps(at(26), box));
     expect(mine(box).length).toBe(enrolled - 2);
     await sendReminders(deps(at(6 * 24 + 1), box));

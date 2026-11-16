@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { NORTHWIND_THEME, SEED_USERS, STREAMSPACE_THEME } from "../lib/server/seed";
-import { admin, rgb, signIn, waitForSignInLink } from "./support";
+import { admin, inbox, messageHtml, rgb, signIn, waitForSignInLink } from "./support";
 
 const COURSE = "/streamspace/ime-engineering";
 
@@ -15,6 +15,13 @@ test("a learner signs in by magic link and lands on the course page", async ({ p
   await expect(page.getByText("a sign-in link is on its way")).toBeVisible();
 
   const link = await waitForSignInLink(SEED_USERS.aisha.email, sentAt);
+  // Auth hands the email to the app, which sends it in Streamspace's branding with its logo as a PNG.
+  const [email] = await inbox(SEED_USERS.aisha.email);
+  expect(email.Subject).toBe("Your sign-in link for Streamspace");
+  const logoSrc = /src="([^"]*\/api\/email-logo\/streamspace\.png[^"]*)"/.exec(await messageHtml(email.ID))?.[1];
+  expect(logoSrc).toBeTruthy();
+  const logo = await page.request.get(logoSrc!.replace(/&amp;/g, "&"));
+  expect(logo.headers()["content-type"]).toBe("image/png");
   await page.goto(link);
   await expect(page).toHaveURL(new RegExp(`${COURSE}$`));
 

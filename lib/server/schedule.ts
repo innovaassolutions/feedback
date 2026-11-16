@@ -3,6 +3,9 @@ import { markOnce } from "@/lib/server/jobs/queue";
 import { scheduleDocumentationReads } from "@/agents/librarian/sources";
 import { checkAlerts } from "@/lib/server/quality/jobs";
 import { followUpWindow } from "@/lib/server/follow-up";
+import { publicEnv } from "@/lib/env";
+import { brandCache } from "@/lib/server/mail/brand";
+import { brandedEmail } from "@/lib/server/mail/layout";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -17,6 +20,7 @@ export async function sendReminders(deps: JobDeps) {
     .from("sessions")
     .select("id, organization_id, course_id, number, title, opened_at, closes_at, courses!inner(slug, title, organizations!inner(slug))")
     .eq("state", "open");
+  const brandFor = brandCache(deps.admin);
   let sent = 0;
   for (const s of sessions ?? []) {
     if (!s.opened_at) continue;
@@ -33,16 +37,23 @@ export async function sendReminders(deps: JobDeps) {
       deps.admin.from("completions").select("user_id").eq("session_id", s.id).eq("kind", "session"),
     ]);
     const finished = new Set((done ?? []).map((d) => d.user_id));
-    const link = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/${s.courses.organizations.slug}/${s.courses.slug}/sessions/${s.number}/interview`;
+    const link = `${publicEnv.appUrl}/${s.courses.organizations.slug}/${s.courses.slug}/sessions/${s.number}/interview`;
+    const brand = await brandFor(s.organization_id);
     for (const reminder of due) {
       for (const l of learners ?? []) {
         if (finished.has(l.user_id)) continue;
         if (!(await markOnce(deps.admin, `reminder:${reminder.key}:${s.id}:${l.user_id}`, s.organization_id, "reminder_sent"))) continue;
-        await deps.mailer.send({
-          to: l.email,
-          subject: reminder.subject,
-          text: `Hello ${l.display_name.split(" ")[0]},\n\nYour feedback on Session ${s.number}: ${s.title} helps shape the next session. It takes about five minutes, and you choose how anonymous to be.\n\n${link}`,
-        });
+        await deps.mailer.send(
+          brandedEmail(l.email, reminder.subject, brand, {
+            preview: "About five minutes, and you choose how anonymous to be.",
+            heading: reminder.subject,
+            body: [
+              `Hello ${l.display_name.split(" ")[0]},`,
+              `Your feedback on Session ${s.number}: ${s.title} helps shape the next session. It takes about five minutes, and you choose how anonymous to be.`,
+            ],
+            button: { label: "Give feedback", url: link },
+          }),
+        );
         sent++;
       }
     }
@@ -83,6 +94,7 @@ export async function applyRetention(deps: JobDeps) {
 /** Tells learners when a course's follow-up interview opens. */
 export async function announceFollowUps(deps: JobDeps) {
   const { data: courses } = await deps.admin.from("courses").select("id, organization_id, slug, title, organizations!inner(slug)");
+  const brandFor = brandCache(deps.admin);
   let sent = 0;
   for (const c of courses ?? []) {
     const window = await followUpWindow(deps.admin, c.id, deps.now());
@@ -92,15 +104,22 @@ export async function announceFollowUps(deps: JobDeps) {
       deps.admin.from("completions").select("user_id").eq("session_id", window.sessionId).eq("kind", "follow_up"),
     ]);
     const finished = new Set((done ?? []).map((d) => d.user_id));
-    const link = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/${c.organizations.slug}/${c.slug}/sessions/${window.sessionNumber}/interview?kind=follow_up`;
+    const link = `${publicEnv.appUrl}/${c.organizations.slug}/${c.slug}/sessions/${window.sessionNumber}/interview?kind=follow_up`;
+    const brand = await brandFor(c.organization_id);
     for (const l of learners ?? []) {
       if (finished.has(l.user_id)) continue;
       if (!(await markOnce(deps.admin, `follow_up_invite:${c.id}:${l.user_id}`, c.organization_id, "reminder_sent"))) continue;
-      await deps.mailer.send({
-        to: l.email,
-        subject: `${c.title}: has it helped at work?`,
-        text: `Hello ${l.display_name.split(" ")[0]},\n\nIt's been a while since the course. A short follow-up asks what you've used at work and what got in the way. About five minutes.\n\n${link}`,
-      });
+      await deps.mailer.send(
+        brandedEmail(l.email, `${c.title}: has it helped at work?`, brand, {
+          preview: "A short follow-up, about five minutes.",
+          heading: "Has the course helped at work?",
+          body: [
+            `Hello ${l.display_name.split(" ")[0]},`,
+            `It's been a while since ${c.title}. A short follow-up asks what you've used at work and what got in the way. About five minutes.`,
+          ],
+          button: { label: "Start the follow-up", url: link },
+        }),
+      );
       sent++;
     }
   }
