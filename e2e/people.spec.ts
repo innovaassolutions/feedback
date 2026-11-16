@@ -38,3 +38,19 @@ test("the platform page lists platform admins and can add one", async ({ page })
   await expect(card.getByText("Added Quinn Platform as a platform admin.", { exact: false })).toBeVisible();
   await expect(card).toContainText(email);
 });
+
+test("an instructor pastes a whole class list, longer than one address field, in the forms people use", async ({ page }) => {
+  const stamp = Date.now();
+  const lines = [
+    ...Array.from({ length: 12 }, (_, i) => `Class Learner${i} <class.${stamp}.${i}@roster.example>`),
+    `Lovelace, Ada <ada.${stamp}@roster.example>`,
+    `Grace Hopper\tgrace.${stamp}@roster.example`,
+  ];
+  expect(lines.join("\n").length).toBeGreaterThan(320);
+  await signIn(page, "marcus", "/streamspace/ime-engineering/admin/roster");
+  await page.getByLabel("Email addresses").fill(lines.join("\n"));
+  await page.getByRole("button", { name: "Invite learners" }).click();
+  await expect(page.getByTestId("invite-report")).toContainText("Enrolled 14 learners", { timeout: 60_000 });
+  await expect(page.getByTestId("roster")).toContainText("Lovelace, Ada");
+  await expect(page.getByTestId("roster")).toContainText("Grace Hopper");
+});

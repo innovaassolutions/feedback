@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/client/api";
+import { splitPasted } from "@/lib/invitees";
 import { Button, Field, Notice, inputClass } from "@/components/ui";
 
 type Report = {
@@ -21,7 +22,17 @@ export function InviteForm({ courseId }: { courseId: string }) {
     setBusy(true);
     setError(null);
     setReport(null);
-    const res = await api<Report>("POST", `/api/courses/${courseId}/enrollments`, { emails: [String(form.get("emails") ?? "")] });
+    // One entry per learner. The whole list as one entry was refused once it passed 320 characters.
+    const emails = splitPasted(String(form.get("emails") ?? ""));
+    if (!emails.length) {
+      setBusy(false);
+      return setError("Paste at least one email address.");
+    }
+    if (emails.length > 500) {
+      setBusy(false);
+      return setError(`That's ${emails.length} entries. Invite up to 500 at a time.`);
+    }
+    const res = await api<Report>("POST", `/api/courses/${courseId}/enrollments`, { emails });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setReport(res.data);

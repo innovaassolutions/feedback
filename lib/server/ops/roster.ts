@@ -3,32 +3,18 @@ import { z } from "zod";
 import { signInRedirect } from "@/lib/auth";
 import type { Ctx } from "@/lib/server/ctx";
 import type { OperationInput } from "@/lib/operations";
+import { readInvitee, splitPasted } from "@/lib/invitees";
 import { courseForUser, requireManage } from "./common";
 
 const emailSchema = z.email();
 
-/** "Ada Lovelace <ada@example.com>" or just the address. */
+/** One pasted entry, or null if it doesn't hold exactly one valid address. */
 export function parseInvitee(entry: string): { email: string; name: string } | null {
-  const trimmed = entry.trim();
-  const angle = /^(.*?)<([^>]+)>$/.exec(trimmed);
-  const email = (angle ? angle[2] : trimmed).trim().toLowerCase();
-  if (!emailSchema.safeParse(email).success) return null;
-  const given = angle ? angle[1].trim().replace(/^"|"$/g, "") : "";
-  const name =
-    given ||
-    email
-      .split("@")[0]
-      .split(/[._-]+/)
-      .filter(Boolean)
-      .map((p) => p[0].toUpperCase() + p.slice(1))
-      .join(" ");
-  return { email, name };
+  const invitee = readInvitee(entry);
+  return invitee && emailSchema.safeParse(invitee.email).success ? invitee : null;
 }
 
-/** Splits pasted text on commas, semicolons and new lines, keeping "Name <email>" together. */
-export function splitPasted(text: string): string[] {
-  return text.split(/[\n;,]+/).map((s) => s.trim()).filter(Boolean);
-}
+export { splitPasted };
 
 /**
  * Enrolls learners and sends each a magic link. Duplicates (already enrolled, or repeated in
