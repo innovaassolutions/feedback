@@ -77,8 +77,9 @@ export const loadCourse = cache(async (orgSlug: string, courseSlug: string): Pro
     roles,
     can: {
       manage: roles.has("instructor") || roles.has("org_admin") || roles.has("platform_admin"),
-      readResults: roles.has("instructor") || roles.has("sponsor"),
-      readTranscripts: roles.has("instructor"),
+      // Admins see results as instructors do (Todd's change to the plan's roles); sponsors see the aggregate.
+      readResults: roles.has("instructor") || roles.has("sponsor") || roles.has("org_admin") || roles.has("platform_admin"),
+      readTranscripts: roles.has("instructor") || roles.has("org_admin") || roles.has("platform_admin"),
       instruct: roles.has("instructor"),
       learn: roles.has("learner"),
     },

@@ -238,6 +238,8 @@ describe("a person's first email", () => {
     const toAdmin = await firstEmail(platformAdmin, "/platform");
     expect(toAdmin.subject).toBe("You're now a platform admin of the Course Feedback Platform");
     expect(toAdmin.text).toContain(`${APP}/sign-in`);
+    // Other tests count the platform admins (alerts go to each), so this one doesn't stay.
+    await admin().auth.admin.deleteUser(platformAdmin.id);
   });
 
   it("names the organization even when the link opens the home page", async () => {

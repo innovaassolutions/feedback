@@ -1461,6 +1461,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      course_has_feedback: { Args: { p_course: string }; Returns: boolean }
       course_org: { Args: { course: string }; Returns: string }
       delete_my_data: { Args: { p_course: string }; Returns: Json }
       get_branding: { Args: { p_slug: string }; Returns: Json }
@@ -1525,6 +1526,8 @@ export type Database = {
         }[]
       }
       quality_figures: { Args: never; Returns: Json }
+      reads_course_detail: { Args: { course: string }; Returns: boolean }
+      session_has_activity: { Args: { p_session: string }; Returns: boolean }
       session_response_counts: {
         Args: { p_course: string }
         Returns: {

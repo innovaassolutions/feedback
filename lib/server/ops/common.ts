@@ -45,6 +45,12 @@ export async function requireInstructor(ctx: Ctx, courseId: string) {
   if (!(await isInstructor(ctx, courseId))) throw forbidden("Only the course's instructors can do this");
 }
 
+/** The course's instructors and its organization's admins: results in full detail, and transcripts. */
+export async function readsCourseDetail(ctx: Ctx, courseId: string) {
+  const { data } = await ctx.db.rpc("reads_course_detail", { course: courseId });
+  return data === true;
+}
+
 export async function canReadResults(ctx: Ctx, courseId: string) {
   return rpcBool(ctx, "can_read_results", courseId);
 }

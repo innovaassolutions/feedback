@@ -107,6 +107,45 @@ describe("sponsors", () => {
   });
 });
 
+describe("admins", () => {
+  // Organization admins and platform admins see results as instructors do (Todd's change to the
+  // plan's roles). The anonymity rules apply to them unchanged.
+  async function orgAdminOnly() {
+    const email = `org.admin.only.${Date.now()}@staff.example`;
+    const { data } = await admin().auth.admin.createUser({ email, email_confirm: true });
+    await sql()`insert into public.memberships (organization_id, user_id, role, course_id, display_name, email) values (${ids.streamspace}, ${data.user!.id}, 'org_admin', null, 'Org Admin Only', ${email})`;
+    return ctxAs({ email });
+  }
+
+  it("an organization admin who isn't an instructor, and the platform admin, see full results and transcripts", async () => {
+    const s = await demoSession("Admin view");
+    for (const who of [await orgAdminOnly(), await ctxAs("platformAdmin")]) {
+      const r = await getSessionResults(who, { session_id: s.id });
+      expect(r.tiles!.able.count).toBe(5);
+      expect(r).toHaveProperty("quotes");
+      const list = await listInterviews(who, { session_id: s.id }, { seed: 7 });
+      expect(list.named.length).toBe(3);
+      expect(list.anonymous.length).toBe(3);
+      expect(JSON.stringify(list)).not.toContain("Unsure who to ask"); // never the private interview
+      expect((await getSessionQuotes(who, s.id)).hidden).toBe(false);
+    }
+  });
+
+  it("see nothing below the group size, and nothing from another organization", async () => {
+    const s = await demoSession("Admin four only", 4);
+    const orgAdmin = await orgAdminOnly();
+    const r = await getSessionResults(orgAdmin, { session_id: s.id });
+    expect(r.hidden).toBe(true);
+    expect(r).not.toHaveProperty("quotes");
+    const { data } = await orgAdmin.db.from("interviews").select("anonymity").eq("session_id", s.id);
+    expect((data ?? []).map((d) => d.anonymity).sort()).toEqual(["named", "named", "named"]);
+    // Northwind's admin can't see Streamspace's results.
+    const owen = await ctxAs("owen");
+    expect([403, 404]).toContain(await statusOf(getSessionResults(owen, { session_id: s.id })));
+    expect([403, 404]).toContain(await statusOf(listInterviews(owen, { session_id: s.id })));
+  });
+});
+
 describe("the session summary", () => {
   it("is replaced by the template when it contains a number that wasn't passed in", async () => {
     const s = await demoSession("Summary check");

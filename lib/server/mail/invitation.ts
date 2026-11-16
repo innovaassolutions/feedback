@@ -80,7 +80,7 @@ export async function invitationFor(
     ];
   } else if (!courseSlug && has("org_admin", null)) {
     subject = `You're now an admin of ${brand.name}'s course feedback`;
-    lines = [`${brand.name} has made you an admin of its course feedback.`, "You can manage its branding, courses and people, and set up every course."];
+    lines = [`${brand.name} has made you an admin of its course feedback.`, "You can manage its branding, courses and people, set up every course and see its results."];
   }
 
   return {

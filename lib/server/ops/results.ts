@@ -16,7 +16,7 @@ import {
   type ThemeRow,
 } from "@/lib/metrics";
 import { DEFAULT_SESSION_GUIDE } from "@/lib/guide";
-import { canReadResults, isInstructor, sessionForUser } from "./common";
+import { canReadResults, isInstructor, readsCourseDetail, sessionForUser } from "./common";
 import { sealRef } from "@/lib/server/refs";
 
 type RawResults = {
@@ -89,7 +89,7 @@ export function shapeResults(raw: RawResults, session: SessionResults["session"]
 
 export async function resultsFor(ctx: Ctx, sessionId: string, kind: "session" | "follow_up"): Promise<SessionResults> {
   const session = await sessionForUser(ctx, sessionId);
-  if (!(await canReadResults(ctx, session.course_id))) throw forbidden("Results are for the course's instructors and sponsor");
+  if (!(await canReadResults(ctx, session.course_id))) throw forbidden("Results are for the course's instructors, sponsors and admins");
   const { data, error } = await ctx.db.rpc("session_results", { p_session: session.id, p_kind: kind });
   if (error) throw new Error(`session_results: ${error.message}`);
   if (!data) throw forbidden("Results are for the course's instructors and sponsor");
@@ -108,10 +108,10 @@ export async function getFollowUpResults(ctx: Ctx, sessionId: string) {
   return resultsFor(ctx, sessionId, "follow_up");
 }
 
-/** Quotes on their own: instructors only. Anyone else gets 404. */
+/** Quotes on their own: instructors and admins only. Anyone else gets 404. */
 export async function getSessionQuotes(ctx: Ctx, sessionId: string) {
   const session = await sessionForUser(ctx, sessionId);
-  if (!(await isInstructor(ctx, session.course_id))) throw notFound("Not found");
+  if (!(await readsCourseDetail(ctx, session.course_id))) throw notFound("Not found");
   const results = await resultsFor(ctx, sessionId, "session");
   return { hidden: results.hidden, quotes: results.quotes ?? [] };
 }
@@ -151,7 +151,7 @@ type Transcript = {
  */
 export async function listInterviews(ctx: Ctx, input: OperationInput<"list_interviews">, opts: { seed?: number; withRefs?: boolean } = {}) {
   const session = await sessionForUser(ctx, input.session_id);
-  if (!(await isInstructor(ctx, session.course_id))) throw notFound("Not found");
+  if (!(await readsCourseDetail(ctx, session.course_id))) throw notFound("Not found");
   // Row Level Security and the column grants decide what comes back: no private interviews,
   // no anonymous ones below the threshold, and no timestamps at all.
   const { data: interviews, error } = await ctx.db

@@ -8,7 +8,7 @@ const ROLE_CHOICES = [
   {
     value: "org_admin",
     label: "Organization admin",
-    description: "Manages branding, courses and people, and sets up every course. Sees results only if also added as an instructor or sponsor.",
+    description: "Manages branding, courses and people, sets up every course, and sees every course's results and transcripts.",
   },
   {
     value: "instructor",
