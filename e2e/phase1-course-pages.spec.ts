@@ -76,8 +76,8 @@ test("header links are readable: each takes the theme's on-primary color, not th
     probe.remove();
     return { background: getComputedStyle(el).backgroundColor, onPrimary, links: [...el.querySelectorAll("a")].map((a) => getComputedStyle(a).color) };
   });
-  // The organization name, then Sessions, Dashboard, Admin and Branding.
-  expect(colors.links).toHaveLength(5);
+  // The organization name, then Sessions, Dashboard, Admin, Branding and Help.
+  expect(colors.links).toHaveLength(6);
   for (const color of colors.links) {
     expect(color).toBe(colors.onPrimary);
     expect(color).not.toBe(colors.background);

@@ -11,7 +11,10 @@ export default async function Home() {
       <main className="mx-auto max-w-xl px-4 py-24">
         <h1 className="text-3xl font-semibold">Course Feedback Platform</h1>
         <p className="mt-3 text-muted">Session feedback, questions and results for your course.</p>
-        <LinkButton href="/sign-in" className="mt-8">Sign in</LinkButton>
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <LinkButton href="/sign-in">Sign in</LinkButton>
+          <Link href="/docs">Read the user guide</Link>
+        </div>
       </main>
     );
   }

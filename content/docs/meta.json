@@ -1,0 +1,17 @@
+{
+  "title": "User guide",
+  "pages": [
+    "index",
+    "signing-in",
+    "---For learners---",
+    "...learners",
+    "---For instructors and sponsors---",
+    "...instructors",
+    "---Running a course---",
+    "...running-a-course",
+    "---Platform administration---",
+    "...platform",
+    "---How it works---",
+    "...how-it-works"
+  ]
+}

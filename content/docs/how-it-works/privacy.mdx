@@ -1,0 +1,52 @@
+---
+title: Privacy and data
+description: What is stored, who can see it, how long it's kept, and which services handle it.
+---
+
+## Who can see what
+
+| | Learner | Instructor | Sponsor | Org admin | Platform admin |
+| --- | --- | --- | --- | --- | --- |
+| Their own course's sessions and materials | ✓ | ✓ | ✓ | ✓ | |
+| Results (tiles, charts, themes, summary) | | ✓ | ✓ | | |
+| Named transcripts | | ✓ | | | |
+| Anonymous transcripts, at five or more responses | | ✓ | | | |
+| Private transcripts | | | | | |
+| Quotes, blockers and suggestions | | ✓ | | | |
+| Agent quality figures | | | | | ✓ |
+
+An organization admin who is also an instructor on a course sees what an instructor sees there. Learners see the **You said, we did** list but not the results.
+
+## How anonymity is enforced
+
+- The database itself, not the page, decides what each person can read. Every table has access rules, checked by tests that sign in as people from different organizations.
+- An anonymous or private interview stores no link to the learner. The record that a learner has taken part is kept separately, with a date and no time, and nothing connects the two.
+- Anonymous transcripts are shown in random order, with no names or times, and only from five responses.
+- The interviewer isn't given the learner's name in anonymous and private interviews, and the voice service is told the name "Learner".
+- Logs never contain anything a learner said.
+- Results can't be cut by job title, team or any other attribute.
+
+## How long data is kept
+
+| Data | Kept for |
+| --- | --- |
+| Conversations | 365 days from submission (set per course), then deleted. Scores and themes stay |
+| Private conversations | Deleted as soon as they're analysed |
+| Unfinished interviews | Closed after 24 hours without activity. Ratings stay, and the conversation isn't analysed |
+| Audio | Never stored by the platform |
+
+A learner can remove their named interviews and questions at any time from **Your data** on the course page.
+
+## The services involved
+
+| Service | What it does | What it receives |
+| --- | --- | --- |
+| **Supabase** | Database, sign-in and file storage | All platform data |
+| **Vercel** | Hosts the platform | Requests to the platform |
+| **Vercel AI Gateway** and the model provider | Run the AI agents | The text each agent needs for its task |
+| **Vocal Bridge** | Turns speech into text and the interviewer's replies into speech | The audio of a voice interview, and the name "Learner" unless the interview is named |
+| **Resend** | Sends sign-in links, reminders and notices | Email addresses and the email text |
+
+<Callout title="Voice recordings at the voice service" type="warn">
+  The platform never stores audio, but the voice service keeps its own call recordings unless that's turned off in its settings. Check this before using voice with real learners.
+</Callout>

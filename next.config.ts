@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { createMDX } from "fumadocs-mdx/next";
 
 const nextConfig: NextConfig = {
   // The end-to-end server runs beside `npm run dev`, so it needs its own build directory.
@@ -22,4 +23,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// The user guide at /docs is MDX, compiled by Fumadocs.
+const withMDX = createMDX();
+
+export default withMDX(nextConfig);

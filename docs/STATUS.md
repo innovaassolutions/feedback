@@ -2,7 +2,9 @@
 
 **All eight phases are built.** 80 of the plan's 85 criteria are verified and ticked. The five that aren't are Live criteria: two voice trials need a person speaking (the Vocal Bridge key and agent are set up and checked), and three need the client's real Session 1 rebuild guide or Streamspace logo. See [Not yet verified](#not-yet-verified).
 
-Last checked on 15 November 2026: `npm run check` passes (type check, lint, 107 Vitest tests in 13 files) and `npm run e2e` passes (22 Playwright tests) while `npm run dev` is running. `npm run evals` passes against the real model (rubric 97.7%, themes 95.8%).
+Last checked on 16 November 2026: `npm run check` passes (type check, lint, 117 Vitest tests in 14 files) and `npm run e2e` passes (24 Playwright tests) while `npm run dev` is running.
+
+**Production** runs at https://feedback.innovaas.co (see [Deploying](#deploying)). The user guide is at `/docs`. `npm run evals` passes against the real model (rubric 97.7%, themes 95.8%).
 
 ## What's built
 
@@ -16,6 +18,7 @@ Last checked on 15 November 2026: `npm run check` passes (type check, lint, 107 
 | 6. Session Q&A | The live Q&A board, the Librarian's cited answers, documentation sites, verified answers as sources, the Q&A tile |
 | 7. Branding and a new tenant | The Brand designer, contrast adjustment, the preview and approval page, theme history, organization and course creation |
 | 8. Quality, reminders and follow-up | `agent_runs` for every agent call, the rubric job, the quality page, alerts, the review queue and labelled-set candidates, the eval merge gate in CI, reminders, the follow-up interview, retention and a learner's removal request |
+| After the build: user guide | A user guide at `/docs`, built with Fumadocs from the MDX pages in `content/docs`: sign-in, the learner's interview, anonymity, voice, Q&A, the dashboard, transcripts, running a course, branding, platform administration, the agents, privacy, settings and an FAQ. It uses the platform theme's colors, has search, and is linked as Help in every course header |
 
 The four product agents are in `agents/`, each with `AGENT.md` (the Interviewer at 1.8.0, the others at 1.0.0), `tools.ts`, `schema.ts`, `evals/`, the agent's code and its stub. Rules that must always hold are in code: the Interviewer's stages, turn and time limits, topic tracking, which tools each turn offers, and the double checks on ending early and on blocker alerts (`agents/interviewer/engine.ts`), anonymity (the schema, column grants and `lib/server/ops/interviews.ts`), quote and theme checks (`agents/analyst/validate.ts`), citation checks (`agents/librarian/answer.ts`), the summary number check (`agents/analyst/summary.ts`) and contrast (`lib/theme/adjust.ts`).
 
@@ -88,13 +91,14 @@ Theme agreement stayed between 93.8% and 95.8% on Analyst 1.0.0 throughout.
 
 ## Deploying
 
-Not done in this build (it needs Todd's accounts). The steps:
+Production was set up on 16 November 2026, at Todd's request, with no demo data: it starts empty apart from the platform admin, and the real organization is created through `/platform`.
 
-1. Create the Supabase project and run `supabase link` then `supabase db push`. The migrations create the tables, policies, functions and both storage buckets.
-2. In Supabase Auth: set the site URL and redirect URLs to the Vercel address; paste `supabase/templates/magic_link.html` into the Magic Link email template; turn off sign-ups by email for unknown addresses if wanted (the app never creates accounts at sign-in); set SMTP to Resend (open decision 8), since Supabase's built-in email is rate-limited.
-3. In Vercel, set the environment variables in `.env.example`: Supabase URL and keys, `NEXT_PUBLIC_APP_URL`, `AI_GATEWAY_API_KEY` (or rely on Vercel's OIDC token for the AI Gateway), the model ids, `VOCAL_BRIDGE_API_KEY` and `VOCAL_BRIDGE_AGENT_ID`, `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, and optionally `REVIEW_REF_SECRET`.
-4. `vercel.json` asks for the cron tick every 15 minutes, which needs a Pro plan. On Hobby, change it to daily.
-5. Seed the real organization through `/platform` rather than `npm run db:reset`, which seeds fictional data.
+- **Address:** https://feedback.innovaas.co, a custom domain on the Vercel project. The project's `*.vercel.app` addresses need a Vercel login (its protection setting is "all except custom domains"). The DNS record is an `A` record `feedback → 76.76.21.21` at Cloudflare, DNS only.
+- **Vercel:** project `feedback` in the Innovaas Solutions team (Pro, so the 15-minute cron runs). Functions run in `sin1` (Singapore), next to the database (`vercel.json`). Production was deployed from the `build` branch with `vercel deploy --prod`; the project's production branch is `main`, so once Todd merges, pushes to `main` deploy.
+- **Environment variables (production):** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`, `AI_GATEWAY_API_KEY`, `VOCAL_BRIDGE_API_KEY`, `VOCAL_BRIDGE_AGENT_ID`, `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, `EMAIL_FROM=Course Feedback <feedback@innovaas.co>`, `CRON_SECRET` and `REVIEW_REF_SECRET` (both generated for production). Preview deployments have none, so they don't touch production data.
+- **Supabase:** project `feedback` (ref `oxtyoohphjfsohoiivto`, Singapore). `supabase db push` applied every migration. Auth was set with `supabase config push` from a copy of `supabase/config.toml` with these production values: site URL and redirect URLs on https://feedback.innovaas.co; sign-ups off (accounts come only from invitations); the magic-link template from `supabase/templates/magic_link.html`; SMTP through Resend (`smtp.resend.com:465`, user `resend`, the Resend key, sender `feedback@innovaas.co`); 100 emails an hour; one email per address a minute; 100 sign-in requests and verifications per IP per five minutes, so a classroom behind one network can sign in together. To repeat it, copy `supabase/config.toml`, change those values, and run `supabase config push --project-ref oxtyoohphjfsohoiivto --workdir <copy>` with `RESEND_API_KEY` set.
+- **Email:** Resend, on the verified `innovaas.co` domain. Resend's free plan sends 100 emails a day, which a large invitation can reach.
+- **Large uploads:** a Vercel function accepts at most 4.5 MB, so documents over that fail in production until uploads go straight to Storage (see Proposed plan changes). The user guide says so.
 
 ## Not yet verified
 
@@ -106,6 +110,8 @@ Not done in this build (it needs Todd's accounts). The steps:
 | Phase 5, Live: a full voice interview in Chrome on a laptop and in a phone browser | Needs a person speaking; the phone also needs HTTPS | As above, on both devices (the phone needs the app reachable over HTTPS) |
 | Phase 6, Live: "How do I find my project ID?" answered from the rebuild guide | The real rebuild guide isn't in the repository | The guide on Session 1, then ask the question as a learner |
 | Phase 7, Live: the Streamspace logo gives a blue primary that passes every contrast pair | The seeded logo is a placeholder | The real logo, uploaded on `/streamspace/settings/brand` |
+| Production sign-in by email (not a plan criterion) | Production was set up on 16 November 2026. A sign-in link has to reach a real inbox | Todd signs in at https://feedback.innovaas.co with his platform admin address and confirms the link arrives from feedback@innovaas.co and signs him in |
+| Voice in production (not a plan criterion) | As the voice trial above | The same trial on https://feedback.innovaas.co, which also gives the phone check the HTTPS it needs |
 
 Live criteria verified on 15 November 2026 against `npm run dev` and the real model:
 - **Phase 3, a full interview.** A scripted learner took Session 1 in a browser, typing instantly. On Interviewer 1.5.0 it covered every topic in 0.4 minutes with model replies of 2–5 seconds. The read-back named Get Document Data, Core Agent, Link Generator and the project ID, the insights named four themes, and no blocker alert went out. A person typing would take a few minutes.

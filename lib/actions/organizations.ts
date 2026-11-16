@@ -8,7 +8,7 @@ import { DEFAULT_FOLLOW_UP_GUIDE, DEFAULT_SESSION_GUIDE } from "@/lib/guide";
 
 export type FormState = { status: "idle" | "error"; message: string };
 
-const RESERVED = new Set(["platform", "sign-in", "auth", "api", "settings", "admin", "dashboard", "_next", "static"]);
+const RESERVED = new Set(["platform", "sign-in", "auth", "api", "settings", "admin", "dashboard", "docs", "_next", "static"]);
 const slugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/, "Use 3 to 50 lowercase letters, numbers and hyphens");
 
 /** A platform admin creates an organization with a name, an address and a logo. */

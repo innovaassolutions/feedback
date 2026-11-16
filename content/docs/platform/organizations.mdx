@@ -1,0 +1,22 @@
+---
+title: Organizations
+description: The platform admin creates each organization, its first theme and its first admin.
+---
+
+Platform admins see **Platform administration** on their courses page, or go to `/platform`.
+
+## Creating an organization
+
+Under **New organization**, enter:
+
+- **Name**: as it should appear, such as "Streamspace".
+- **Address**: the path its pages live under, such as `streamspace` for `/streamspace`. Use 3 to 50 lowercase letters, numbers and hyphens. A few words the platform uses itself, such as `docs`, `admin` and `platform`, are reserved.
+- **Logo**: PNG or SVG, up to 2 MB.
+
+Choose **Create organization**. The platform stores the logo, asks the brand designer for a theme, and opens the organization's **Branding** page so you can check and approve it. See [Branding](/docs/running-a-course/branding).
+
+The **Organizations** list links to each organization's **Branding** and **Courses** pages.
+
+## Separate by design
+
+Each organization's data is kept apart by the database itself. Every record carries its organization, and the database refuses to return a record from another organization, whatever the page asks for. A learner in one organization can't see that another exists. An address from another organization shows "Page not found", exactly like an address that doesn't exist.

@@ -130,6 +130,15 @@ Every choice the plan didn't make, one line each: the phase, what was decided, a
 - Phase 8: the labelled-set candidate list shows course, session and Analyst version. Adding a transcript to the eval set is a manual step that needs the instructor's agreement.
 - Phase 8: CI pins the Supabase CLI to 2.75.0, the local version, because the latest (3.1) rejects the `[inbucket]` section of `supabase/config.toml`. Moving to 3.x means renaming that section to `[local_smtp]` and checking the test-stack script.
 
+## After the build
+
+- User guide: Fumadocs (`fumadocs-ui`, `fumadocs-core`, `fumadocs-mdx`), at Todd's request, a library the plan doesn't name. The guide lives at `/docs` in the same app, written in MDX under `content/docs`, so it deploys with the platform. Its colors are mapped to the platform theme's variables in `app/docs/docs.css` (Tailwind's palette and Fumadocs' own colors are cleared first), and its theme switch is off because light and dark follow the system setting everywhere else. `docs` is a reserved organization address.
+- Production starts empty, without the fictional seed or demo interviews. Todd chose an explainer page for colleagues over a demo system with their accounts.
+- Production deploys from `build` with the Vercel CLI, so `main` stays untouched until Todd merges.
+- Production functions run in Singapore (`sin1`), next to the Supabase project, because every page makes several database calls.
+- Production Auth: sign-ups off, since the app never creates an account at sign-in; one sign-in email per address a minute; 100 sign-in requests per IP per five minutes, so a class on one network can scan the QR code together.
+- Jobs: `claim_jobs` now claims a job still "running" fifteen minutes after it was claimed, because its run was cut off (a function timeout or a server restart) and nothing else would retry it. A session summary job had sat in "running" since a dev-server restart, leaving the summary out of date. After three attempts such a job is marked failed.
+
 ## Proposed plan changes
 
 - Phase 3: the conversation topic "whether the last session's changes helped" pulls against "no leading questions". Asked that way it suggests the changes helped, and the rubric judge fails it. Suggest "how the last session's changes worked for the learner", which is what the Interviewer now asks. Many learners also can't compare with a session they missed, so the topic could be skipped for learners who didn't take the previous interview.

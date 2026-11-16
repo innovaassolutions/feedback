@@ -35,6 +35,9 @@ export function OrgHeader({
               {item.label}
             </Link>
           ))}
+          <Link href="/docs" className="text-on-primary underline-offset-4 hover:underline sm:ml-auto">
+            Help
+          </Link>
         </nav>
         {email ? (
           <form action="/auth/sign-out" method="post" className="flex items-center gap-3 text-sm">

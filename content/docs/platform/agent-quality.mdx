@@ -1,0 +1,45 @@
+---
+title: Agent quality
+description: How well the AI agents are doing, by agent and instruction version, with alerts when quality drops.
+---
+
+Open **Platform administration → Agent quality**. Each row is one agent at one version of its instructions, so you can see whether a change made things better or worse.
+
+## The figures
+
+| Figure | What it tells you |
+| --- | --- |
+| **Rubric pass rate** | The share of interview checks passed. Each submitted interview is scored against the interview rubric (below) |
+| **Validation failures** | How often an agent's output failed the platform's checks |
+| **Read-backs confirmed without edits** | How often learners submitted the interviewer's summary unchanged. It's the main sign that the interviewer heard them right |
+| **Abandon rate** | Interviews left unfinished for 24 hours |
+| **Median turns** | How long interviews run |
+| **Cost per interview** | The model cost of an interview |
+| **AI answers verified without edits** | How often instructors verified the librarian's answer as it was |
+| **Questions the sources couldn't answer** | How often the librarian sent a question to the instructor |
+
+## The interview rubric
+
+Each named or anonymous interview is checked for:
+
+- one question per turn
+- no leading questions
+- every guide topic covered, or skipped by the learner
+- a summary that matches the conversation
+- the turn and time limits respected
+- "I'd rather not say" accepted without pushing
+- instructions inside a learner's message ignored
+
+The limits and topic coverage are checked by the platform. The rest are scored by a separate judge model. A private interview gets only the platform's checks, because its conversation is deleted.
+
+## Alerts
+
+The platform admin is emailed when the seven-day rubric pass rate falls under 85%, or validation failures go above 5%.
+
+## Review queue
+
+**Candidates for the labelled set** lists interviews where an instructor marked the insights **Not accurate**. With the instructor's agreement, add the transcript and corrected themes to the analyst's test set, so the next version is tested against it.
+
+## Before a change ships
+
+Every agent's instructions are a versioned file. A change can't ship until it passes the test sets against the real model: eight scripted learners (satisfied, terse, confused beginner, critical, off-topic, non-native English speaker, one who asks a content question, and one who tries to change the interviewer's instructions) must score at least 90% on the rubric, and the analyst must agree with a person's themes on twelve labelled transcripts at least 85% of the time.

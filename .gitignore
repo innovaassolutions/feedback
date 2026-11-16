@@ -35,3 +35,6 @@ supabase/.temp
 
 # eval dry runs against the stub model are not evidence
 /evals/reports/*-stub-*
+
+# fumadocs-mdx output, rebuilt by next dev and next build
+/.source/

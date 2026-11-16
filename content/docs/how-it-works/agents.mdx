@@ -1,0 +1,44 @@
+---
+title: The AI agents
+description: Four agents do the AI work. The platform's own rules keep them in line.
+---
+
+Four AI agents do specific jobs. Each has written instructions with a version number, a fixed set of tools and an output format the platform checks. Anything that must always hold, such as anonymity, limits, citations and contrast, is enforced by the platform's code, not left to an agent's instructions.
+
+## The interviewer
+
+Holds the feedback interview with each learner, by voice or chat.
+
+- **The platform decides the stage**: consent, then ratings, then conversation, then summary. The AI writes the questions and follow-ups within each stage.
+- **Its tools**: save a rating, post a question to Q&A (only with the learner's agreement), tell the instructor about a blocker, and end the interview. It can't read other learners' feedback, the roster or the dashboard.
+- **What it knows**: the course's interview guide, the session brief the instructor approved, and the changes recorded since the last session. It never reads documents directly. In anonymous and private interviews it isn't told the learner's name.
+- **Rules the platform enforces**: a tapped rating is saved without asking the AI. A rating is saved only from a real answer, and "I don't understand the question" is never saved as an answer. It asks for clarification once per rating, keeps to the turn and time limits, and checks that the summary mentions only what was said.
+
+## The analyst
+
+Reads each submitted interview, together with the summary the learner confirmed.
+
+- **Produces**: positive or negative mentions per theme, blockers, suggestions, quotes and one-line paraphrases.
+- **Themes come from a fixed list**, so results compare across sessions: Content and relevance, Pace and timing, Instructor delivery, Hands-on practice, Materials and documentation, Platform and access, Logistics, and Support and follow-up.
+- **Rules the platform enforces**: a quote must appear word for word in what the learner said, or it's dropped. A theme outside the list fails the check, and a failed output is retried once before the interview is marked **Needs review**. The analyst never produces or changes a rating.
+- **For private interviews** it writes paraphrases only, and the conversation is deleted when it finishes.
+- **It also writes each session's summary.** The platform passes in every number. If the summary contains a number it wasn't given, a plain summary written from the numbers replaces it.
+
+## The librarian
+
+Reads the course's sources and answers questions from them.
+
+- **Reads** each uploaded document and the organization's documentation site, and splits them into searchable passages.
+- **Drafts the session brief** from the session's documents, for the instructor to edit and approve.
+- **Answers Q&A questions** by searching three kinds of source for that course only: session documents, documentation pages and verified answers.
+- **Rules the platform enforces**: every answer must cite the passages it used, and each citation must exist and belong to the course. If nothing relevant enough is found, it doesn't answer and the question goes to the instructor. If sources disagree, the answer says so and the instructor is told.
+
+## The brand designer
+
+Proposes a theme from an organization's logo: colors for light and dark mode, five chart colors, a corner radius, and heading and body fonts from an approved list.
+
+- **Rules the platform enforces**: every text and background pair must reach a 4.5 to 1 contrast ratio, or the proposal is adjusted. Nothing goes live until an organization admin approves it.
+
+## Every call is recorded
+
+Each agent call records the agent, its instructions' version, the model, tokens, cost, time taken and whether its output passed the checks. Records for anonymous and private interviews carry no learner. These records feed the [agent quality](/docs/platform/agent-quality) page.

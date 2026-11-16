@@ -1,0 +1,44 @@
+/*
+ * The user guide at /docs: Fumadocs' layout, drawn in the platform theme. Its colors come from the
+ * theme's CSS variables, so the guide follows the same light and dark tokens as every other page.
+ * Tailwind's default palette and Fumadocs' own colors are cleared first, as in globals.css.
+ */
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--text);
+  --color-fd-muted: var(--surface);
+  --color-fd-muted-foreground: var(--muted);
+  --color-fd-popover: var(--surface);
+  --color-fd-popover-foreground: var(--text);
+  --color-fd-card: var(--surface);
+  --color-fd-card-foreground: var(--text);
+  --color-fd-border: var(--border);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--on-primary);
+  --color-fd-secondary: var(--primary-soft);
+  --color-fd-secondary-foreground: var(--text);
+  --color-fd-accent: var(--primary-soft);
+  --color-fd-accent-foreground: var(--text);
+  --color-fd-ring: var(--primary);
+  --color-fd-overlay: color-mix(in srgb, var(--text) 20%, transparent);
+
+  --color-fd-info: var(--primary);
+  --color-fd-warning: var(--accent);
+  --color-fd-error: var(--danger);
+  --color-fd-success: var(--success);
+  --color-fd-idea: var(--accent);
+  --color-fd-diff-remove: color-mix(in srgb, var(--danger) 12%, transparent);
+  --color-fd-diff-remove-symbol: var(--danger);
+  --color-fd-diff-add: color-mix(in srgb, var(--success) 12%, transparent);
+  --color-fd-diff-add-symbol: var(--success);
+}
